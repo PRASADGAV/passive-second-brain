@@ -1,100 +1,104 @@
-# Deployment Guide — Railway + Vercel
+# 100% Free Deployment Guide — Render + Vercel + Neo4j AuraDB
 
-## Prerequisites
-- GitHub account with this repo pushed
-- Railway account at [railway.app](https://railway.app)
-- Vercel account at [vercel.com](https://vercel.com)
+This guide provides complete instructions to deploy the **Passive Second Brain** application **completely free of charge** (no credit card required).
 
 ---
 
-## Step 1 — Push to GitHub
+## 🏗️ Architecture & Services Overview
 
-```bash
-cd C:\Users\prasa\Desktop\Mega
-git init
-git add .
-git commit -m "Initial commit — Passive Second Brain"
-git remote add origin https://github.com/YOUR_USERNAME/passive-second-brain.git
-git push -u origin main
-```
-
-Make sure `.gitignore` includes: `backend/.env`, `.env`, `data/`, `node_modules/`
+| Service | Platform | Tier | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | **Vercel** | Free Tier | React + Vite UI |
+| **Backend API** | **Render** | Free Web Service | FastAPI Python Server |
+| **Graph Database** | **Neo4j AuraDB** | Free Tier (512MB / 200k nodes) | Knowledge Graph Storage |
+| **Vector Store** | **Qdrant Cloud / Chroma** | Free Tier | RAG / Embeddings |
 
 ---
 
-## Step 2 — Deploy Backend to Railway
+## Step 1 — Set Up Free Neo4j AuraDB Graph Database
 
-1. Go to [railway.app](https://railway.app) → **New Project**
-2. Click **Deploy from GitHub repo** → select your repo
-3. Railway auto-detects the Dockerfile in `/backend`
-4. Set these **Environment Variables** in Railway dashboard:
-   ```
-   GROQ_API_KEY=gsk_your_key_here
-   NEO4J_URI=bolt://your-neo4j-host:7687
-   NEO4J_USER=neo4j
-   NEO4J_PASSWORD=your_password
-   PSB_API_KEY=your-secret-key
-   DEVELOPER_MODE=false
-   CHROMA_HOST=your-chromadb-host
-   CHROMA_PORT=8000
-   PORT=8080
-   PYTHONPATH=/app
-   ```
-5. Railway gives you a URL like: `https://psb-backend.railway.app`
-
-**Note:** For Railway, you'll need Neo4j and ChromaDB also hosted.
-- Neo4j: Use [Neo4j AuraDB free tier](https://neo4j.com/cloud/platform/aura-graph-database/) — free, cloud-hosted
-- ChromaDB: Deploy as second Railway service using `chromadb/chroma:latest`
+1. Go to [neo4j.com/cloud/aura/](https://neo4j.com/cloud/aura/) and sign up for a **Free Account**.
+2. Click **Create Database** → Select **Neo4j AuraDB Free**.
+3. Download or copy your credentials immediately:
+   - `NEO4J_URI`: e.g. `neo4j+s://xxxxxxxx.databases.neo4j.io`
+   - `NEO4J_USER`: `neo4j`
+   - `NEO4J_PASSWORD`: `your-generated-password`
 
 ---
 
-## Step 3 — Update CORS in backend
+## Step 2 — Deploy Backend API to Render (Free Web Service)
 
-After getting your Railway URL, update `backend/main.py`:
+1. Sign up at [render.com](https://render.com).
+2. Click **New +** → **Blueprints** (or **Web Service**).
+3. Connect your GitHub repository `PRASADGAV/passive-second-brain`.
+4. Configure Web Service settings:
+   - **Root Directory**: `backend`
+   - **Environment**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Instance Type**: **Free**
+5. Add **Environment Variables** in Render:
+   - `GROQ_API_KEY`: `your-groq-api-key`
+   - `NEO4J_URI`: `neo4j+s://xxxxxxxx.databases.neo4j.io`
+   - `NEO4J_USER`: `neo4j`
+   - `NEO4J_PASSWORD`: `your-generated-password`
+   - `PSB_API_KEY`: `your-secret-api-key`
+   - `PORT`: `10000`
+6. Click **Create Web Service**. Once deployed, copy your backend URL (e.g., `https://psb-backend.onrender.com`).
+
+---
+
+## Step 3 — Update CORS in Backend
+
+Update `backend/main.py` with your Vercel URL once generated:
 
 ```python
 ALLOWED_ORIGINS: list[str] = [
     "http://localhost:5173",
-    "https://your-frontend.vercel.app",  # add this
+    "https://your-frontend.vercel.app",
 ]
 ```
 
-Commit and push — Railway auto-redeploys.
-
----
-
-## Step 4 — Deploy Frontend to Vercel
-
-1. Go to [vercel.com](https://vercel.com) → **New Project**
-2. Import your GitHub repo
-3. Set **Root Directory** to `frontend`
-4. Set **Framework Preset** to `Vite`
-5. Add **Environment Variables**:
-   ```
-   VITE_API_BASE_URL=https://psb-backend.railway.app
-   VITE_API_KEY=your-secret-key
-   VITE_DEVELOPER_MODE=false
-   ```
-6. Click **Deploy** — Vercel gives you `https://your-app.vercel.app`
-
----
-
-## Step 5 — Update Extension for production
-
-In `extension/background.js`, the `PSB_API_URL` defaults to `http://localhost:8090`.
-
-For production, users need to set it via chrome.storage or you can hardcode the Railway URL:
-```javascript
-const { PSB_API_URL = 'https://psb-backend.railway.app', ... }
+Commit & push updates:
+```bash
+git add .
+git commit -m "Update CORS origins for Vercel deployment"
+git push origin main
 ```
 
 ---
 
-## Quick Summary
+## Step 4 — Deploy Frontend to Vercel (Free Frontend Hosting)
 
-| Service | URL pattern | Cost |
-|---------|-------------|------|
-| Railway (backend) | `https://psb-XXX.railway.app` | Free $5 credits/month |
-| Vercel (frontend) | `https://psb-XXX.vercel.app` | Free forever |
-| Neo4j AuraDB | `neo4j+s://XXX.databases.neo4j.io` | Free 512MB |
-| ChromaDB on Railway | second service | uses free credits |
+1. Go to [vercel.com](https://vercel.com) and log in with GitHub.
+2. Click **Add New...** → **Project** → Import `passive-second-brain`.
+3. Configure the Deployment:
+   - **Root Directory**: Select `frontend`
+   - **Framework Preset**: `Vite`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. Add **Environment Variables**:
+   - `VITE_API_BASE_URL`: `https://psb-backend.onrender.com`
+   - `VITE_API_KEY`: `your-secret-api-key`
+5. Click **Deploy**. Vercel will build and provide your URL (e.g., `https://passive-second-brain.vercel.app`).
+
+---
+
+## Step 5 — Configure Chrome Extension for Production
+
+1. Open `extension/background.js`.
+2. Update the default backend URL to point to your Render production backend:
+```javascript
+const PSB_API_URL = 'https://psb-backend.onrender.com';
+```
+3. Load `extension/` directory into Chrome as an Unpacked Extension (`chrome://extensions` → **Load unpacked**).
+
+---
+
+## ⚡ Quick Summary
+
+| Component | URL Pattern | Cost |
+| :--- | :--- | :--- |
+| **Backend** | `https://psb-backend.onrender.com` | **$0.00 / month** |
+| **Frontend** | `https://passive-second-brain.vercel.app` | **$0.00 / month** |
+| **Neo4j DB** | `neo4j+s://xxx.databases.neo4j.io` | **$0.00 / month** |
