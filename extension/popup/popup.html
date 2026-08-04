@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Passive Second Brain</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 280px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .header h1 { font-size: 14px; font-weight: 600; }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .status-label { font-size: 12px; color: #94a3b8; }
+    .toggle-btn {
+      background: #22c55e;
+      border: none;
+      border-radius: 20px;
+      color: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      transition: background 0.2s;
+    }
+    .toggle-btn.paused { background: #ef4444; }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #94a3b8;
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .stat-value { color: #38bdf8; font-weight: 600; }
+    .footer { font-size: 10px; color: #475569; text-align: center; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🧠 Passive Second Brain</h1>
+  </div>
+
+  <div class="status-row">
+    <div>
+      <div class="status-label">Tracking</div>
+      <div id="status-text" style="font-size:13px;font-weight:600;margin-top:2px;">Active</div>
+    </div>
+    <button id="toggle-btn" class="toggle-btn">Pause</button>
+  </div>
+
+  <div class="stat-row">
+    <span>Items queued</span>
+    <span id="queue-count" class="stat-value">0</span>
+  </div>
+
+  <div class="stat-row">
+    <span>Reading threshold</span>
+    <span id="threshold-value" class="stat-value">60s</span>
+  </div>
+
+  <div class="footer">Knowledge captured passively — zero effort required.</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

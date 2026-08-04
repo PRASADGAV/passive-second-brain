@@ -1,0 +1,346 @@
+/* ══ FLOATING GRAPH PAGE — OBYS editorial white ══ */
+
+.fg-page {
+  position: fixed;
+  inset: 0;
+  background: #FAFAF8;
+  overflow: hidden;
+  z-index: 9999;
+}
+
+.fg-ambient { display: none; }
+
+/* ── Top bar ─────────────────────────────────────────── */
+.fg-topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  z-index: 100;
+  background: #FAFAF8;
+}
+
+.fg-topbar__back {
+  background: none;
+  border: none;
+  color: rgba(13,13,13,0.4);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.fg-topbar__back:hover { color: #0D0D0D; }
+
+.fg-topbar__title {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(13,13,13,0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fg-topbar__count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: rgba(13,13,13,0.25);
+  letter-spacing: 0;
+}
+
+.fg-topbar__search {
+  width: 200px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  border-radius: 0;
+  padding: 6px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #0D0D0D;
+  outline: none;
+  cursor: text;
+  transition: border-color 0.2s;
+}
+.fg-topbar__search::placeholder { color: rgba(13,13,13,0.25); }
+.fg-topbar__search:focus { border-color: #0D0D0D; }
+
+/* ── Stage ───────────────────────────────────────────── */
+.fg-stage {
+  position: absolute;
+  top: 52px; left: 0; right: 0; bottom: 0;
+  perspective: 1200px;
+  transition: transform 0.1s linear;
+  will-change: transform;
+}
+
+/* ── Card drift ────────────────────────────────────── */
+.fg-card__drift {
+  width: 100%; height: 100%;
+  animation: fg-card-drift linear infinite alternate;
+  animation-duration: var(--drift-dur, 8s);
+  animation-delay: var(--drift-delay, 0s);
+}
+@keyframes fg-card-drift {
+  0%   { transform: translate(0, 0); }
+  33%  { transform: translate(calc(var(--drift-x, 10px) * 0.5), calc(var(--drift-y, 8px) * 0.7)); }
+  66%  { transform: translate(var(--drift-x, 10px), calc(var(--drift-y, 8px) * -0.4)); }
+  100% { transform: translate(calc(var(--drift-x, 10px) * -0.3), var(--drift-y, 8px)); }
+}
+
+/* ── Cards ──────────────────────────────────────────── */
+.fg-card {
+  border-radius: 0;
+  overflow: hidden;
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+.fg-card__inner {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  min-height: 220px;
+}
+
+.fg-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fg-card__domain {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(13,13,13,0.5);
+}
+
+.fg-card__dot {
+  width: 5px; height: 5px;
+  border-radius: 0;
+  background: rgba(13,13,13,0.2);
+}
+
+.fg-card__name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  line-height: 1.0;
+  letter-spacing: 0.02em;
+  color: #0D0D0D;
+}
+
+.fg-card__summary {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 300;
+  line-height: 1.65;
+  color: rgba(13,13,13,0.45);
+  flex: 1;
+}
+
+.fg-card__footer { margin-top: auto; }
+
+.fg-card__bar-track {
+  width: 100%;
+  height: 1px;
+  background: rgba(0,0,0,0.08);
+  margin-bottom: 10px;
+}
+
+.fg-card__bar-fill {
+  height: 100%;
+  background: #0D0D0D;
+  transition: width 0.6s ease;
+}
+
+.fg-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: rgba(13,13,13,0.25);
+  letter-spacing: 0.06em;
+}
+
+/* ── Detail overlay ─────────────────────────────────── */
+.fg-detail {
+  position: fixed;
+  inset: 0;
+  background: rgba(250,250,248,0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.fg-detail__card {
+  position: relative;
+  width: 420px;
+  max-width: 92vw;
+  padding: 40px 36px 32px;
+  border-radius: 0;
+  background: #FAFAF8;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.fg-detail__close {
+  position: absolute;
+  top: 16px; right: 20px;
+  background: none; border: none;
+  font-size: 20px; font-weight: 300;
+  color: rgba(13,13,13,0.3);
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+.fg-detail__close:hover { color: #0D0D0D; }
+
+.fg-detail__domain {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(13,13,13,0.4);
+  margin-bottom: 10px;
+}
+
+.fg-detail__name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 52px; line-height: 0.95;
+  letter-spacing: 0.01em;
+  margin-bottom: 20px;
+  color: #0D0D0D;
+}
+
+.fg-detail__summary {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 300;
+  line-height: 1.7;
+  color: rgba(13,13,13,0.5);
+  margin-bottom: 24px;
+}
+
+.fg-detail__bar-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: rgba(13,13,13,0.35);
+  margin-bottom: 6px;
+}
+
+.fg-detail__bar-track {
+  width: 100%; height: 2px;
+  background: rgba(0,0,0,0.08);
+  margin-bottom: 4px;
+}
+
+.fg-detail__bar-fill {
+  height: 100%;
+  background: #00C853;
+  transition: width 0.8s ease;
+}
+
+.fg-detail__bar-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgba(13,13,13,0.35);
+  margin-bottom: 20px;
+}
+
+.fg-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-bottom: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.fg-detail__grid > div {
+  background: #FAFAF8;
+  padding: 10px;
+}
+
+.fg-detail__item-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: rgba(13,13,13,0.3);
+  margin-bottom: 2px;
+}
+
+.fg-detail__item-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; color: #0D0D0D;
+}
+
+.fg-detail__source {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: rgba(13,13,13,0.3);
+  word-break: break-all;
+  text-decoration: underline;
+  text-decoration-color: rgba(0,0,0,0.08);
+  transition: color 0.2s;
+  display: block;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+.fg-detail__source:hover { color: #0D0D0D; }
+
+/* ── Loading / error ────────────────────────────────── */
+.fg-loading {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  height: 100%;
+  gap: 20px;
+}
+
+.fg-loading__text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 72px; line-height: 0.9;
+  color: rgba(13,13,13,0.08);
+  animation: fg-pulse 2s ease-in-out infinite;
+}
+@keyframes fg-pulse {
+  0%, 100% { opacity: 0.2; }
+  50%       { opacity: 0.5; }
+}
+
+.fg-retry {
+  background: #0D0D0D;
+  border: none;
+  color: #FAFAF8;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  border-radius: 0;
+}
+.fg-retry:hover { opacity: 0.8; }
+
+/* ── Footer ─────────────────────────────────────────── */
+.fg-footer {
+  position: absolute;
+  bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; color: rgba(13,13,13,0.18);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  pointer-events: none;
+}

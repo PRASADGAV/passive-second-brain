@@ -1,0 +1,123 @@
+
+🧠
+PASSIVE SECOND BRAIN
+AI-Powered Automatic Knowledge Graph Construction
+from Digital Learning Activity
+
+
+1.  Executive Summary
+Passive Second Brain is a final-year B.Tech capstone project in Artificial Intelligence and Machine Learning. The system addresses a fundamental and largely unsolved problem in personal knowledge management: the automatic, passive construction of a semantic knowledge graph from a user's everyday digital learning activity.
+
+Unlike all existing tools — Notion, Obsidian, Roam Research, Readwise — which require manual content capture and tagging, Passive Second Brain operates entirely in the background. The user simply lives their digital life — browsing articles, watching educational videos, opening PDFs — and the system silently ingests, processes, and structurally organizes that knowledge into a living, queryable graph.
+
+
+
+2.  Pain Points
+The following five pain points were identified through analysis of existing knowledge management tools, student behaviour patterns, and cognitive science research on human memory:
+
+P1 — Knowledge Evaporation
+Students and professionals consume large volumes of digital content daily — research papers, video lectures, articles, documentation — yet retain less than 10% of it after 30 days due to the natural forgetting curve (Ebbinghaus, 1885). There exists no automated system to counteract this at the point of consumption.
+
+P2 — Manual Capture Friction
+Existing knowledge management tools such as Notion, Obsidian, and Roam Research require the user to manually save, tag, and link every piece of content they consume. This creates cognitive overhead that causes most users to abandon the system within weeks. The tool that is supposed to reduce mental load itself becomes a burden.
+
+P3 — Isolated Knowledge Silos
+Even when content is saved, it is stored as flat, disconnected files. A user who studied transformer architecture in August and reads about RAG systems in November receives no signal that these two concepts are deeply related. Knowledge never compounds — it accumulates without connecting.
+
+P4 — No Temporal Awareness
+Current tools have no memory of when something was learned or how long ago it was last revisited. There is no mechanism to alert the user that a critical concept is fading from memory before it becomes completely forgotten.
+
+P5 — Zero Passive Intelligence
+Every existing solution is fully reactive — it only works when the user actively interacts with it. There is no system that observes a user's natural digital learning behaviour and builds understanding automatically in the background.
+
+3.  Problem Statement
+
+
+
+4.  What We Are Building
+Passive Second Brain is an AI-powered personal knowledge management system that operates entirely in the background of a user's digital life. The system consists of four tightly integrated layers:
+
+4.1  Layer 1 — Passive Capture Engine
+A lightweight Chrome browser extension and optional desktop agent monitors the user's learning activity in real time. It captures:
+▸  Webpages where reading time exceeds a defined threshold (configurable, default 60 seconds)
+▸  YouTube video transcripts where watch completion exceeds 50%
+▸  Locally opened PDFs and documents via the desktop agent
+▸  Optional voice notes via microphone transcription using Whisper
+
+All captured data remains locally stored on the user's device. No raw content is transmitted to any external server, ensuring complete data privacy.
+
+4.2  Layer 2 — Nightly AI Processing Pipeline
+At a user-defined time each night, an automated pipeline processes all content captured during the day. Using large language models via Groq API (Llama 3.3 70B), the pipeline performs the following:
+▸  Extracts key concepts, entities, and factual claims from raw content
+▸  Identifies semantic relationships between new and existing knowledge nodes
+▸  Generates vector embeddings stored in ChromaDB for similarity-based retrieval
+▸  Produces a structured 'Today's Learning Digest' summarising what was absorbed
+▸  Recalculates forgetting scores for all existing nodes in the graph
+
+4.3  Layer 3 — Semantic Knowledge Graph
+All extracted knowledge is stored as an interconnected graph in Neo4j. Each concept is a node; relationships between concepts are directed edges with semantic labels such as 'is a subset of', 'contradicts', 'is prerequisite for', and 'extends'.
+
+A forgetting score is computed for each node using the SM-2 spaced repetition algorithm — the same algorithm underlying Anki — adapted for graph nodes rather than flashcards. When a node's score crosses a critical threshold, the system proactively surfaces it in the user's dashboard.
+
+4.4  Layer 4 — Conversational Interface & Visual Dashboard
+The React-based frontend provides the complete user-facing experience:
+▸  Natural Language Chat Interface — User asks questions in plain English; system answers from their own captured knowledge using RAG — not from the internet.
+▸  Interactive Visual Knowledge Graph — Every concept mapped, colour-coded by domain, with node brightness indicating memory freshness. Built with D3.js.
+▸  Daily Digest Panel — What was learned today, what it connects to in existing knowledge, and what is approaching the forgetting threshold.
+▸  Privacy Control Panel — Granular control over what is tracked, paused, or permanently deleted.
+
+5.  Product Requirements Document (PRD)
+5.1  Product Vision
+To build the world's first fully passive, AI-native personal knowledge graph that requires zero user effort and ensures that everything a person learns becomes permanently accessible, interconnected, and unforgettable.
+
+5.2  Target Users
+▸  Final-year engineering students managing large volumes of study material
+▸  Software developers consuming technical documentation, tutorials, and research papers
+▸  Researchers and academics building knowledge across domains over time
+▸  Self-learners who consume educational content across multiple platforms daily
+
+5.3  Functional Requirements
+
+
+5.4  Non-Functional Requirements
+
+
+5.5  Tech Stack
+
+
+5.6  Differentiation from Existing Tools
+
+
+
+6.  System Architecture & Flow Diagram
+6.1  High-Level Architecture Flow
+
+
+6.2  Data Flow — Step by Step
+
+
+6.3  Knowledge Graph — Node & Edge Structure
+
+
+
+7.  Faculty Q&A — Anticipated Questions
+The following questions represent typical faculty evaluation criteria for final-year CSE/AI-ML capstone projects:
+
+Q:  How is this different from Notion AI or Obsidian?
+A:  Notion AI and Obsidian require the user to manually save and tag every piece of content. They store knowledge as flat files without semantic understanding of relationships. Passive Second Brain requires zero manual input, automatically extracts structured knowledge, builds a relational graph, and tracks memory decay over time. No existing tool combines all five capabilities in one pipeline.
+Q:  What is the role of the knowledge graph? Why not just a vector database?
+A:  A vector database (ChromaDB) enables similarity-based retrieval — finding content semantically close to a query. However, it cannot represent directional relationships between concepts. The knowledge graph (Neo4j) stores this relational structure explicitly — enabling reasoning such as 'Concept A is prerequisite for Concept B'. Both are used together: ChromaDB for retrieval speed, Neo4j for relational reasoning.
+Q:  How do you handle privacy given that you are monitoring user activity?
+A:  Privacy is a first-class design constraint. All raw captured data is stored exclusively on the user's local machine. Only processed, abstracted knowledge — concept names and relationships — is handled by the AI pipeline. The user has full visibility into everything captured, can pause tracking instantly, and can delete any content at any time.
+Q:  What is the technical novelty of this project?
+A:  The novelty lies in three contributions working as one system: (1) passive, automatic knowledge capture requiring zero user effort, (2) real-time semantic knowledge graph construction from unstructured multi-modal content, and (3) algorithmic implementation of the Ebbinghaus forgetting curve on a personal knowledge graph. Each exists in isolation in prior work — their integration as one cohesive system has not been demonstrated.
+Q:  What spaced repetition algorithm are you using?
+A:  A modified SM-2 algorithm — the same algorithm underlying Anki — adapted for graph nodes rather than flashcards. Each node has an easiness factor, repetition interval, and last-reviewed timestamp. The forgetting score is computed as a function of these three variables. When the score crosses a threshold, the system surfaces that concept proactively in the dashboard.
+Q:  Why Groq API instead of OpenAI or Gemini?
+A:  Groq offers the fastest free inference available in 2026 — Llama 3.3 70B at 14,400 requests/day on the free tier. Gemini API produced consistent timeout errors on large context payloads during nightly batch processing. Groq's response latency is under 1 second even for large prompts, making it ideal for processing 30–50 captured items per night reliably.
+
+8.  Module-Wise Build Plan & Timeline
+
+
+
+

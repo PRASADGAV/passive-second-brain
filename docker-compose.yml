@@ -1,0 +1,60 @@
+services:
+  neo4j:
+    image: neo4j:5.18-community
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/Prasadgav2123"
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - psb_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  chromadb:
+    image: chromadb/chroma:0.5.0
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/.chroma
+    networks:
+      - psb_internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      NEO4J_URI: "bolt://neo4j:7687"
+      NEO4J_PASSWORD: "Prasadgav2123"
+      CHROMA_HOST: "chromadb"
+      CHROMA_PORT: "8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./backend/prompts:/app/prompts
+    networks:
+      - psb_internal
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  chroma_data:
+
+networks:
+  psb_internal:
+    driver: bridge
