@@ -14,7 +14,18 @@ export function useWebSocket(url) {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) return;
 
     try {
-      const wsUrl = url || `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+      let wsUrl = url;
+      if (!wsUrl) {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+        if (apiBase) {
+          const wsProto = apiBase.startsWith('https') ? 'wss' : 'ws';
+          const host = apiBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
+          wsUrl = `${wsProto}://${host}/ws`;
+        } else {
+          const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+          wsUrl = `${wsProto}://${window.location.host}/ws`;
+        }
+      }
       ws.current = new WebSocket(wsUrl);
 
       ws.current.onopen = () => {

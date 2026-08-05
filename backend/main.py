@@ -169,15 +169,12 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 ALLOWED_ORIGINS: list[str] = [
-    "http://localhost:5173",   # Vite dev server
-    "http://localhost:3000",   # Alternative frontend port
-    "http://localhost:8080",   # Backend itself (Swagger UI)
-    "http://localhost:8081",   # Backend on port 8081
+    "*",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
