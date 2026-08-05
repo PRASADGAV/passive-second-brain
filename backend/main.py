@@ -112,19 +112,35 @@ async def lifespan(app: FastAPI):
     app.state.neo4j = Neo4jService()
     app.state.vector_db = VectorDBService()
     app.state.groq = GroqClient()
-    app.state.neo4j.init_schema()
+
+    try:
+        app.state.neo4j.init_schema()
+        logger.info("Neo4j schema initialised successfully")
+    except Exception as exc:
+        logger.warning("Neo4j schema init warning: %s", exc)
+
     # Start nightly pipeline scheduler
-    app.state.scheduler = create_scheduler(
-        graph_db=app.state.neo4j,
-        vector_db=app.state.vector_db,
-    )
-    app.state.scheduler.start()
+    try:
+        app.state.scheduler = create_scheduler(
+            graph_db=app.state.neo4j,
+            vector_db=app.state.vector_db,
+        )
+        app.state.scheduler.start()
+    except Exception as exc:
+        logger.warning("Scheduler startup warning: %s", exc)
+        app.state.scheduler = None
+
     app.state.pipeline_status = {"status": "idle", "last_run": None, "items_processed": 0, "error": None}
     app.state.ws_manager = ws_manager
     logger.info("All services initialised successfully")
     yield
-    app.state.scheduler.shutdown(wait=False)
-    app.state.neo4j.close()
+    if getattr(app.state, "scheduler", None):
+        app.state.scheduler.shutdown(wait=False)
+    if hasattr(app.state, "neo4j") and app.state.neo4j:
+        try:
+            app.state.neo4j.close()
+        except Exception:
+            pass
     logger.info("Passive Second Brain backend shutting down")
 
 # ---------------------------------------------------------------------------
