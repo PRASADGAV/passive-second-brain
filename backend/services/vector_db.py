@@ -16,18 +16,36 @@ logger = logging.getLogger(__name__)
 
 
 class VectorDBService:
-    """ChromaDB HTTP client wrapper for the Passive Second Brain vector store."""
+    """ChromaDB client wrapper for the Passive Second Brain vector store."""
 
     def __init__(self) -> None:
-        host = os.environ.get("CHROMA_HOST", "localhost")
-        port = int(os.environ.get("CHROMA_PORT", "8000"))
+        chroma_host = os.environ.get("CHROMA_HOST", "").strip()
+        chroma_port = os.environ.get("CHROMA_PORT", "").strip()
+        persist_dir = os.environ.get("CHROMA_PERSIST_DIR", "./data/chroma")
 
-        self.client = chromadb.HttpClient(host=host, port=port)
+        # Try connecting via HTTP if a specific remote host is provided
+        if chroma_host and chroma_host not in ("localhost", "127.0.0.1", "embedded"):
+            try:
+                port = int(chroma_port) if chroma_port else 8000
+                self.client = chromadb.HttpClient(host=chroma_host, port=port)
+                self.collection = self.client.get_or_create_collection("psb_concepts")
+                logger.info(
+                    "ChromaDB HTTP client connected",
+                    extra={"component": "vector_db", "host": chroma_host, "port": port},
+                )
+                return
+            except Exception as exc:
+                logger.warning(
+                    f"Could not connect to Chroma HTTP server at {chroma_host}:{chroma_port}, falling back to PersistentClient: {exc}"
+                )
+
+        # Embedded PersistentClient mode (no separate Chroma server required)
+        os.makedirs(persist_dir, exist_ok=True)
+        self.client = chromadb.PersistentClient(path=persist_dir)
         self.collection = self.client.get_or_create_collection("psb_concepts")
-
         logger.info(
-            "ChromaDB client connected and collection ready",
-            extra={"component": "vector_db", "host": host, "port": port},
+            "ChromaDB PersistentClient connected (embedded mode)",
+            extra={"component": "vector_db", "path": persist_dir},
         )
 
     # ------------------------------------------------------------------
