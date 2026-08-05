@@ -31,7 +31,10 @@ class Neo4jService:
             user = "neo4j"
         password = os.environ.get("NEO4J_PASSWORD", "").strip()
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        logger.info("Neo4j driver created", extra={"component": "graph_db", "uri": uri})
+        logger.info(
+            "Neo4j driver created",
+            extra={"component": "graph_db", "uri": uri, "user": user, "password_len": len(password)},
+        )
 
     # ------------------------------------------------------------------
     # Schema
