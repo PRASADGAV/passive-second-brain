@@ -25,9 +25,11 @@ class Neo4jService:
     """Sync Neo4j driver wrapper for the Passive Second Brain knowledge graph."""
 
     def __init__(self) -> None:
-        uri = os.environ["NEO4J_URI"]
-        user = os.environ["NEO4J_USER"]
-        password = os.environ["NEO4J_PASSWORD"]
+        uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687").strip()
+        user = os.environ.get("NEO4J_USER", "neo4j").strip()
+        if not user or user == "f0eb0005":
+            user = "neo4j"
+        password = os.environ.get("NEO4J_PASSWORD", "").strip()
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         logger.info("Neo4j driver created", extra={"component": "graph_db", "uri": uri})
 
