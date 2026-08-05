@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGraph } from './hooks/useGraph';
 import { useWebSocket } from './hooks/useWebSocket';
-import { pipelineAPI, graphAPI } from './api/client';
+import { pipelineAPI, graphAPI, memoryAPI } from './api/client';
 import { tabVariant } from './animations';
 
 import Cursor from './components/Cursor';
@@ -61,7 +61,14 @@ export default function App() {
   const [selectedDomains, setSelectedDomains] = useState(new Set());
   const [pipelineStatus, setPipelineStatus] = useState({ status: 'idle' });
   const [showFloatingGraph, setShowFloatingGraph] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
   const canvasRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const handleExportJSON = async () => {
     try {
@@ -76,13 +83,52 @@ export default function App() {
       link.click();
       link.parentNode.removeChild(link);
       window.URL.revokeObjectURL(url);
+      showToast('Downloaded Graph JSON Backup');
     } catch (err) {
       console.error('JSON export failed:', err);
+      showToast('Export failed');
     }
   };
 
   const handleExportPNG = () => {
-    if (canvasRef.current) canvasRef.current.exportPNG();
+    if (canvasRef.current) {
+      canvasRef.current.exportPNG();
+      showToast('Downloaded Graph PNG Image');
+    }
+  };
+
+  const handleDeleteNode = async (conceptId) => {
+    try {
+      await graphAPI.deleteConcept(conceptId);
+      setSelectedNode(null);
+      refresh();
+      showToast('Concept deleted');
+    } catch (err) {
+      console.error('Failed to delete node:', err);
+      showToast('Delete failed');
+    }
+  };
+
+  const handleUpdateNode = async (conceptId, updateData) => {
+    try {
+      await graphAPI.updateConcept(conceptId, updateData);
+      setSelectedNode(prev => prev ? { ...prev, ...updateData } : null);
+      refresh();
+      showToast('Concept updated');
+    } catch (err) {
+      console.error('Failed to update node:', err);
+      showToast('Update failed');
+    }
+  };
+
+  const handleReviewNode = async (conceptId) => {
+    try {
+      await memoryAPI.review(conceptId);
+      refresh();
+      showToast('Memory retention updated!');
+    } catch (err) {
+      console.error('Failed to review node:', err);
+    }
   };
 
   const uniqueDomains = Array.from(new Set(nodes.map(n => n.domain || 'General'))).sort();
@@ -118,13 +164,40 @@ export default function App() {
     return () => { clearInterval(interval); clearTimeout(timer); };
   }, []);
 
+  // Keyboard shortcut: Ctrl+K or '/' to focus search
   useEffect(() => {
-    on('node_added', data => { if (data.node) addNode(data.node); });
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    on('node_added', data => {
+      if (data.node) {
+        addNode(data.node);
+        showToast(`Captured: ${data.node.name}`);
+      }
+    });
     on('edge_added', data => { if (data.edge) addEdge(data.edge); });
     on('pipeline_status', data => { setPipelineStatus(data); });
   }, [on, addNode, addEdge]);
 
   const handleNodeClick = useCallback(node => setSelectedNode(node), []);
+
+  const handleCitationClick = useCallback((citation) => {
+    const matched = nodes.find(n =>
+      n.concept_id === citation.concept_id ||
+      n.name?.toLowerCase() === citation.name?.toLowerCase()
+    );
+    if (matched) {
+      setSelectedNode(matched);
+    }
+  }, [nodes]);
 
   const pipelineDotClass =
     pipelineStatus.status === 'running' ? 'dot dot--running'
@@ -157,6 +230,33 @@ export default function App() {
   return (
     <>
       <Cursor />
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            style={{
+              position: 'fixed',
+              top: '16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#0D0D0D',
+              color: '#FAFAF8',
+              padding: '8px 16px',
+              fontFamily: 'var(--font-mono, monospace)',
+              fontSize: '12px',
+              border: '1px solid #333',
+              zIndex: 10000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+            }}
+          >
+            {toastMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div
         className="app-shell"
         initial={{ opacity: 0, y: 12 }}
@@ -258,8 +358,9 @@ export default function App() {
               <div className="graph-controls">
                 <div className="graph-controls__input-group">
                   <input
+                    ref={searchInputRef}
                     className="graph-controls__search"
-                    placeholder="Search concepts..."
+                    placeholder="Search concepts... (Ctrl+K)"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     id="graph-search"
@@ -325,6 +426,7 @@ export default function App() {
                   edges={edges}
                   onNodeClick={handleNodeClick}
                   searchTerm={searchTerm}
+                  selectedNode={selectedNode}
                   filteredNodes={getFilteredNodes()}
                 />
               )}
@@ -334,6 +436,9 @@ export default function App() {
                   <NodeDetail
                     node={selectedNode}
                     onClose={() => setSelectedNode(null)}
+                    onDelete={handleDeleteNode}
+                    onUpdate={handleUpdateNode}
+                    onReview={handleReviewNode}
                   />
                 )}
               </AnimatePresence>
@@ -371,7 +476,7 @@ export default function App() {
                   exit="exit"
                   style={{ height: '100%' }}
                 >
-                  {activeTab === 'chat' && <ChatPanel />}
+                  {activeTab === 'chat' && <ChatPanel onConceptClick={handleCitationClick} />}
                   {activeTab === 'digest' && <DigestPanel />}
                   {activeTab === 'report' && <WeeklyReport />}
                   {activeTab === 'input' && <InputPanel />}

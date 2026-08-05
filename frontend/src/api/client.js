@@ -27,6 +27,7 @@ export const graphAPI = {
   getNeighbourhood: (id, hops = 2)          => client.get(`/graph/neighbourhood/${id}?hops=${hops}`),
   getStats:         ()                      => client.get('/graph/stats'),
   createConcept:    (data)                  => client.post('/graph/concept', data),
+  updateConcept:    (id, data)              => client.put(`/graph/concept/${id}`, data),
   deleteConcept:    (id)                    => client.delete(`/graph/concept/${id}`),
   deleteSource:     (url)                   => client.delete(`/graph/source?source_url=${encodeURIComponent(url)}`),
   exportJSON:       ()                      => client.get('/graph/export/json', { responseType: 'blob' }),

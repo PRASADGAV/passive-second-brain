@@ -3,9 +3,9 @@ import { useChat } from '../hooks/useChat';
 
 /**
  * ChatPanel — RAG-powered conversational interface.
- * OBYS editorial: black user bubbles, left-border AI responses, flat inputs.
+ * Displays interactive citation badges that highlight graph concepts on click.
  */
-export default function ChatPanel() {
+export default function ChatPanel({ onConceptClick }) {
   const { messages, loading, send, clear } = useChat();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
@@ -59,11 +59,30 @@ export default function ChatPanel() {
             <div>{msg.content}</div>
 
             {msg.citations && msg.citations.length > 0 && (
-              <div className="chat__citations">
+              <div className="chat__citations" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.6, alignSelf: 'center' }}>
+                  Citations:
+                </span>
                 {msg.citations.map((c, j) => (
-                  <span key={j} className="chat__citation" title={c.source_url}>
-                    {c.name}
-                  </span>
+                  <button
+                    key={j}
+                    className="chat__citation"
+                    title={c.source_url || c.name}
+                    onClick={() => onConceptClick && onConceptClick(c)}
+                    style={{
+                      background: 'rgba(13,13,13,0.06)',
+                      border: '1px solid var(--border-color, #E5E5E0)',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      cursor: 'pointer',
+                      borderRadius: '2px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    data-cursor="hover"
+                  >
+                    📍 {c.name}
+                  </button>
                 ))}
               </div>
             )}
@@ -100,7 +119,7 @@ export default function ChatPanel() {
           disabled={loading || !input.trim()}
           data-cursor="hover"
         >
-          →
+          Send
         </button>
       </div>
     </div>
