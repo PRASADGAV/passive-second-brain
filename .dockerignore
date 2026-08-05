@@ -1,0 +1,12 @@
+.git
+.venv
+.venv-1
+node_modules
+frontend/node_modules
+backend/__pycache__
+*.mp4
+graph_frames/
+psb-extension.zip
+69ad28e1f320b.pdf
+.hypothesis
+.pytest_cache

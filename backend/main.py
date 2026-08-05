@@ -405,6 +405,11 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 
+# Mount frontend static files if running in production bundle (Hugging Face / Single Container)
+from fastapi.staticfiles import StaticFiles
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
 # ---------------------------------------------------------------------------
 # Application entry point
 # ---------------------------------------------------------------------------
