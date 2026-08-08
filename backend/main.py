@@ -187,7 +187,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     # Allow all Vercel preview URLs + chrome extensions automatically
-    allow_origin_regex=r"(https://.*\.vercel\.app|chrome-extension://.*)",
+    allow_origin_regex=r"(https://.*\.vercel\.app|chrome-extension://.*|http://localhost:\d+)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
