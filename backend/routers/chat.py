@@ -11,7 +11,9 @@ Requirements:
     16.6 Multi-turn session context
 """
 
+import json
 import logging
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -28,11 +30,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 # ---------------------------------------------------------------------------
-# In-memory session store (keyed by session_id)
-# Each session stores the last 10 turns: [{role, content}]
+# Session store — in-memory with disk persistence
+#
+# Sessions are written to data/sessions/<session_id>.json so multi-turn
+# conversation history survives server restarts (common on the free Render tier
+# which spins down after 15 minutes of inactivity).
 # ---------------------------------------------------------------------------
 _sessions: dict[str, list[dict]] = {}
 MAX_SESSION_TURNS = 10
+
+# Directory for persisted session files
+_SESSION_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "sessions"
+
+
+def _session_path(session_id: str) -> Path:
+    return _SESSION_DIR / f"{session_id}.json"
+
+
+def _load_session(session_id: str) -> list[dict]:
+    """Load session history from disk, or return empty list if not found."""
+    path = _session_path(session_id)
+    try:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("chat: failed to load session %s from disk: %s", session_id, exc)
+    return []
+
+
+def _save_session(session_id: str, history: list[dict]) -> None:
+    """Persist session history to disk. Silently swallows write errors."""
+    try:
+        _SESSION_DIR.mkdir(parents=True, exist_ok=True)
+        _session_path(session_id).write_text(
+            json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except Exception as exc:
+        logger.warning("chat: failed to save session %s to disk: %s", session_id, exc)
 
 
 class ChatRequest(BaseModel):
@@ -68,11 +102,11 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
             detail="query must be a non-empty string.",
         )
 
-    # Resolve or create session
+    # Resolve or create session — check in-memory cache first, then disk
     import uuid
     session_id = body.session_id or str(uuid.uuid4())
     if session_id not in _sessions:
-        _sessions[session_id] = []
+        _sessions[session_id] = _load_session(session_id)
 
     session_history = _sessions[session_id]
 
@@ -91,6 +125,9 @@ async def chat(body: ChatRequest, request: Request) -> ChatResponse:
     # Trim to last N turns
     if len(session_history) > MAX_SESSION_TURNS * 2:
         _sessions[session_id] = session_history[-(MAX_SESSION_TURNS * 2):]
+
+    # Persist trimmed history to disk so it survives restarts
+    _save_session(session_id, _sessions[session_id])
 
     logger.info(
         "chat: session=%s latency=%.0fms citations=%d",

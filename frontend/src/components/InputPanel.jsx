@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { ingestAPI } from '../api/client';
 
 /**
@@ -172,11 +171,13 @@ export default function InputPanel() {
               setLoading(true);
               setStatus(null);
               try {
-                const form = new FormData();
-                form.append('file', file);
-                const apiKey = import.meta.env.VITE_API_KEY || 'dev-key';
-                await axios.post('/api/ingest/voice', form, { headers: { 'X-API-Key': apiKey, 'Content-Type': 'multipart/form-data' } });
-                setStatus({ type: 'success', msg: `${file.name} queued for transcription.` });
+                const res = await ingestAPI.voice(file);
+                const warning = res.data?.warning;
+                if (warning) {
+                  setStatus({ type: 'error', msg: warning });
+                } else {
+                  setStatus({ type: 'success', msg: `${file.name} queued for transcription.` });
+                }
                 e.target.value = '';
               } catch (err) {
                 setStatus({ type: 'error', msg: err.response?.data?.detail || 'Voice upload failed. Is whisper-cpp installed?' });

@@ -162,19 +162,31 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # CORS middleware
 # ---------------------------------------------------------------------------
-# Allows the React frontend (Vite dev server on localhost:5173) and the Chrome
-# Extension (chrome-extension://*) to reach the backend during development.
-# In production the list of allowed origins should be narrowed to the deployed
-# frontend URL.
+# Allowed origins are driven by the CORS_ORIGINS environment variable so the
+# same codebase works in dev and production without code changes:
+#
+#   Dev (Docker):   not set → defaults below allow localhost:5173 + extension
+#   Production:     set CORS_ORIGINS=https://your-frontend.vercel.app
+#
+# NOTE: allow_credentials=True is incompatible with allow_origins=["*"].
+#       We always use an explicit list so credentials are handled correctly.
 # ---------------------------------------------------------------------------
 
-ALLOWED_ORIGINS: list[str] = [
-    "*",
-]
+_cors_env = os.getenv("CORS_ORIGINS", "")
+if _cors_env.strip():
+    ALLOWED_ORIGINS: list[str] = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    # Default dev origins — localhost frontend + Chrome Extension
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "chrome-extension://*",
+    ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

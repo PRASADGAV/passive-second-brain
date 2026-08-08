@@ -252,4 +252,21 @@ async def ingest_voice(
     )
 
     result = whisper_svc.transcribe_and_queue(str(dest_path), domain)
+
+    # If the transcript is empty, whisper-cpp likely isn't installed.
+    # Return the item_id (so the file is preserved) but include a warning
+    # so the frontend can surface it to the user instead of showing silent "success".
+    if not result.get("transcript_length") and _is_whisper_missing():
+        result["warning"] = (
+            "whisper-cpp binary not found on PATH. "
+            "Audio was saved but transcription was skipped. "
+            "Install whisper-cpp from https://github.com/ggerganov/whisper.cpp and try again."
+        )
+
     return result
+
+
+def _is_whisper_missing() -> bool:
+    """Return True if whisper-cpp is not on the system PATH."""
+    import shutil
+    return shutil.which("whisper-cpp") is None

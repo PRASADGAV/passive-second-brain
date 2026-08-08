@@ -43,6 +43,11 @@ export const ingestAPI = {
     form.append('file', file);
     return client.post('/ingest/pdf', form, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
+  voice:   (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return client.post('/ingest/voice', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // ── Chat API ──

@@ -2,13 +2,14 @@
 graph.py — Knowledge graph REST API router for Passive Second Brain.
 
 Provides CRUD and traversal endpoints over the Neo4j knowledge graph:
-  GET  /graph/nodes                   — list all concept nodes (paginated)
-  GET  /graph/neighbourhood/{id}      — get connected nodes (1-2 hops)
-  GET  /graph/stats                   — node/edge counts + domain breakdown
-  POST /graph/concept                 — create a concept node
-  DELETE /graph/concept/{concept_id}  — delete node + all its edges
-  DELETE /graph/source/{source_url}   — delete all nodes from a source URL
-  GET  /graph/export/json             — export full graph as JSON download
+  GET    /graph/nodes                   — list all concept nodes (paginated)
+  GET    /graph/neighbourhood/{id}      — get connected nodes (1-2 hops)
+  GET    /graph/stats                   — node/edge counts + domain breakdown
+  POST   /graph/concept                 — create a concept node
+  PUT    /graph/concept/{concept_id}    — update an existing concept node
+  DELETE /graph/concept/{concept_id}    — delete node + all its edges
+  DELETE /graph/source/{source_url}     — delete all nodes from a source URL
+  GET    /graph/export/json             — export full graph as JSON download
 
 All write/delete endpoints require X-API-Key header.
 Read endpoints are also protected to keep the graph private.
@@ -54,6 +55,13 @@ class CreateConceptRequest(BaseModel):
     domain: str
     summary: str
     source_url: str
+
+
+class UpdateConceptRequest(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
+    summary: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +220,66 @@ async def create_concept(
 
     logger.info("graph.create_concept: created node %s (%s)", concept_id, node.name)
     return {"concept_id": concept_id, "status": "created"}
+
+
+# ---------------------------------------------------------------------------
+# Update endpoint
+# ---------------------------------------------------------------------------
+
+@router.put(
+    "/concept/{concept_id}",
+    summary="Update an existing concept node",
+    dependencies=[Depends(verify_api_key)],
+)
+async def update_concept(
+    concept_id: str,
+    body: UpdateConceptRequest,
+    request: Request,
+) -> dict:
+    """
+    Partially update a ConceptNode's mutable fields (name, domain, summary,
+    source_url). Only supplied fields are modified; omitted fields keep their
+    current values.
+
+    Also re-upserts the ChromaDB embedding with the updated name/summary so
+    RAG retrieval stays in sync.
+    """
+    node = request.app.state.neo4j.get_node(concept_id)
+    if node is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Concept '{concept_id}' not found.",
+        )
+
+    # Apply partial updates — only fields that were sent in the request body
+    updated_fields: dict = body.model_dump(exclude_none=True)
+    if not updated_fields:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one field (name, domain, summary, source_url) must be provided.",
+        )
+
+    for field, value in updated_fields.items():
+        setattr(node, field, value)
+
+    node.last_seen = datetime.now(timezone.utc)
+
+    # Persist to Neo4j (upsert uses concept_id as merge key)
+    request.app.state.neo4j.upsert_node(node)
+
+    # Re-sync ChromaDB embedding with new name/summary
+    request.app.state.vector_db.upsert_embedding(
+        concept_id,
+        node.name,
+        node.summary,
+        {"domain": node.domain, "source_url": node.source_url, "forget_score": node.forget_score},
+    )
+
+    logger.info(
+        "graph.update_concept: updated node %s fields=%s",
+        concept_id, list(updated_fields.keys()),
+    )
+    return {"concept_id": concept_id, "status": "updated", "updated_fields": list(updated_fields.keys())}
 
 
 # ---------------------------------------------------------------------------

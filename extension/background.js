@@ -23,7 +23,7 @@ const MAX_ERROR_LOG_ENTRIES = 200;  // cap error_log to avoid unbounded growth
  * @returns {Promise<{apiUrl: string, apiKey: string}>}
  */
 async function getApiConfig() {
-  const { PSB_API_URL = 'http://localhost:8081', PSB_API_KEY = '' } =
+  const { PSB_API_URL = 'http://localhost:8090', PSB_API_KEY = '' } =
     await chrome.storage.local.get(['PSB_API_URL', 'PSB_API_KEY']);
   return { apiUrl: PSB_API_URL, apiKey: PSB_API_KEY };
 }

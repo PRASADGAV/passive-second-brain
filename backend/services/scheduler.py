@@ -226,22 +226,28 @@ async def _process_item(
                 {"domain": node.domain, "source_url": node.source_url, "forget_score": 0.0},
             )
 
-        # Upsert edges
-        for rel in extraction.relationships:
+        # Upsert edges — build the name→id map ONCE before the loop (not inside it)
+        if extraction.relationships:
             try:
                 source_nodes = graph_db.get_all_nodes(skip=0, limit=10000)
                 source_map = {n.name.lower(): n.concept_id for n in source_nodes}
-                src_id = source_map.get(rel.from_concept.lower())
-                tgt_id = source_map.get(rel.to_concept.lower())
-                if src_id and tgt_id:
-                    await asyncio.to_thread(
-                        graph_db.upsert_edge,
-                        src_id, tgt_id, rel.type, rel.confidence, now
-                    )
-                    stats["edges_added"] += 1
             except Exception as exc:
-                logger.warning("scheduler: failed to upsert edge %s->%s: %s",
-                               rel.from_concept, rel.to_concept, exc)
+                logger.warning("scheduler: failed to build name→id map: %s", exc)
+                source_map = {}
+
+            for rel in extraction.relationships:
+                try:
+                    src_id = source_map.get(rel.from_concept.lower())
+                    tgt_id = source_map.get(rel.to_concept.lower())
+                    if src_id and tgt_id:
+                        await asyncio.to_thread(
+                            graph_db.upsert_edge,
+                            src_id, tgt_id, rel.type, rel.confidence, now
+                        )
+                        stats["edges_added"] += 1
+                except Exception as exc:
+                    logger.warning("scheduler: failed to upsert edge %s->%s: %s",
+                                   rel.from_concept, rel.to_concept, exc)
 
         _mark_item_status(item_id, CaptureStatus.completed)
         stats["items_processed"] += 1

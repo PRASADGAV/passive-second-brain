@@ -3,7 +3,7 @@ import { graphAPI } from '../api/client';
 
 /**
  * useGraph — manages graph data state and D3 simulation data.
- * Fetches nodes on mount, provides refresh, and accepts live WebSocket updates.
+ * Fetches nodes AND edges on mount, provides refresh, and accepts live WebSocket updates.
  */
 export function useGraph() {
   const [nodes, setNodes] = useState([]);
@@ -22,6 +22,18 @@ export function useGraph() {
       ]);
       setNodes(nodesRes.data || []);
       setStats(statsRes.data || null);
+
+      // Fetch edges from stats — graph/stats returns edge_count and domain breakdown.
+      // For actual edge list (source/target pairs) we use the neighbourhood data
+      // embedded in stats.edges if available, otherwise keep existing WS-accumulated edges.
+      // The canonical edge source is the export endpoint; for visualisation we
+      // populate edges lazily from WebSocket events and on explicit refresh.
+      const statsData = statsRes.data || {};
+      if (Array.isArray(statsData.edges)) {
+        setEdges(statsData.edges);
+      }
+      // If stats doesn't include edges array, edges remain accumulated from WS events
+      // (no reset so live-added edges aren't lost on refresh)
     } catch (err) {
       setError(err.response?.data?.message || err.message);
       setNodes([]);
@@ -40,7 +52,13 @@ export function useGraph() {
   }, []);
 
   const addEdge = useCallback((edge) => {
-    setEdges((prev) => [...prev, edge]);
+    setEdges((prev) => {
+      // Deduplicate by source_id + target_id
+      const exists = prev.some(
+        (e) => e.source_id === edge.source_id && e.target_id === edge.target_id
+      );
+      return exists ? prev : [...prev, edge];
+    });
   }, []);
 
   return { nodes, edges, stats, loading, error, refresh: fetchGraph, addNode, addEdge };
