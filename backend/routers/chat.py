@@ -13,6 +13,7 @@ Requirements:
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -39,8 +40,10 @@ router = APIRouter(tags=["chat"])
 _sessions: dict[str, list[dict]] = {}
 MAX_SESSION_TURNS = 10
 
-# Directory for persisted session files
-_SESSION_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "sessions"
+# Directory for persisted session files.
+# Resolves to <repo_root>/data/sessions locally and /app/data/sessions on Render.
+# Falls back gracefully — _save_session never raises.
+_SESSION_DIR = Path(os.environ.get("PSB_DATA_DIR", Path(__file__).resolve().parent.parent / "data")) / "sessions"
 
 
 def _session_path(session_id: str) -> Path:
