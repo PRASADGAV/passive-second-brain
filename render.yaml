@@ -1,15 +1,14 @@
 services:
   - type: web
-    name: passive-second-brain-backend
+    name: psb-backend
     env: python
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
         value: 10000
       - key: PYTHONPATH
-        value: /app
+        value: /opt/render/project/src
       - key: GROQ_API_KEY
         sync: false
       - key: NEO4J_URI
@@ -20,3 +19,5 @@ services:
         sync: false
       - key: PSB_API_KEY
         sync: false
+      - key: CHROMA_PERSIST_DIR
+        value: /tmp/chroma
