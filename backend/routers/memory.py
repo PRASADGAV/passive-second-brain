@@ -77,20 +77,100 @@ async def memory_alerts(
     }
 
 
-@router.post(
-    "/review/{concept_id}",
-    summary="Record a review event for a concept",
+@router.get(
+    "/review-queue",
+    summary="Get ordered list of concepts due for active review",
     dependencies=[Depends(verify_api_key)],
 )
-async def review_concept(concept_id: str, request: Request) -> dict:
+async def get_review_queue(
+    request: Request,
+    threshold: float = 0.5,
+    limit: int = 20,
+) -> dict:
     """
-    Treat viewing a concept as a successful review event.
+    Return concepts whose forget_score exceeds *threshold*, sorted by
+    forget_score descending (most urgent first).  These are the cards
+    shown in the active review session.
 
-    Updates SM-2 fields (ease_factor, rep_interval, rep_count, last_seen)
-    and recalculates the forget_score.
+    Each item includes name, domain, summary, source_url and SM-2 metadata
+    so the frontend can render a complete flashcard without a second call.
+    """
+    if threshold < 0.0 or threshold > 1.0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="threshold must be between 0.0 and 1.0.",
+        )
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 100.",
+        )
+
+    fading_nodes = request.app.state.neo4j.get_fading_nodes(threshold=threshold)
+
+    queue = []
+    for node in fading_nodes:
+        live_score = compute_forget_score(node)
+        if live_score >= threshold:
+            queue.append({
+                "concept_id":  node.concept_id,
+                "name":        node.name,
+                "domain":      node.domain,
+                "summary":     node.summary or "",
+                "source_url":  node.source_url or "",
+                "forget_score": round(live_score, 4),
+                "rep_count":   node.rep_count,
+                "rep_interval": node.rep_interval,
+                "ease_factor":  round(node.ease_factor, 2),
+                "last_seen":   (
+                    node.last_seen.isoformat()
+                    if hasattr(node.last_seen, "isoformat")
+                    else str(node.last_seen)
+                ),
+            })
+
+    queue.sort(key=lambda x: x["forget_score"], reverse=True)
+    queue = queue[:limit]
+
+    return {
+        "threshold": threshold,
+        "count":     len(queue),
+        "queue":     queue,
+    }
+
+
+@router.post(
+    "/review/{concept_id}",
+    summary="Record a review event for a concept (with optional SM-2 quality grade)",
+    dependencies=[Depends(verify_api_key)],
+)
+async def review_concept(
+    concept_id: str,
+    request: Request,
+    quality: int = 4,
+) -> dict:
+    """
+    Record a review event and update SM-2 parameters.
+
+    quality grades (SM-2 standard):
+      5 — perfect recall, no hesitation
+      4 — correct with slight hesitation  (default)
+      3 — correct with significant difficulty
+      2 — wrong, but remembered once shown
+      1 — wrong, barely recognised
+      0 — complete blackout
+
+    Grades ≥ 3 are "passing" and extend the rep_interval.
+    Grades < 3 reset the interval to 1 day.
 
     Requirement 14.3: record view as review event.
     """
+    if quality < 0 or quality > 5:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="quality must be between 0 and 5.",
+        )
+
     node = request.app.state.neo4j.get_node(concept_id)
     if node is None:
         raise HTTPException(
@@ -98,8 +178,8 @@ async def review_concept(concept_id: str, request: Request) -> dict:
             detail=f"Concept '{concept_id}' not found.",
         )
 
-    # Compute SM-2 update (quality=4 — correct with slight hesitation)
-    sm2_result = update_sm2_on_review(node, quality=4)
+    # Compute SM-2 update with caller-supplied quality grade
+    sm2_result = update_sm2_on_review(node, quality=quality)
 
     # Write updated fields back to Neo4j
     request.app.state.neo4j.update_node_sm2_fields(concept_id, sm2_result)

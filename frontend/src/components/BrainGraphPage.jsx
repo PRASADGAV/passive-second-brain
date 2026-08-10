@@ -372,7 +372,7 @@ function GraphControls({ searchTerm, setSearchTerm, selectedDomains, toggleDomai
 }
 
 // ── Main BrainGraphPage ───────────────────────────────────────────────────────
-export default function BrainGraphPage({ onBack }) {
+export default function BrainGraphPage({ onBack, onSpiralView }) {
   const { nodes, edges, stats, loading, error, refresh } = useGraph();
 
   const [selectedNode,    setSelectedNode]    = useState(null);
@@ -535,6 +535,9 @@ export default function BrainGraphPage({ onBack }) {
           <button className={`bg-topbar__btn ${chatOpen ? 'is-active' : ''}`}
             onClick={() => setChatOpen(v => !v)} data-cursor="hover">
             {chatOpen ? 'Hide Chat' : 'Show Chat'}
+          </button>
+          <button className="bg-topbar__btn" onClick={onSpiralView} data-cursor="hover">
+            ◎ Spiral View
           </button>
           <button className="bg-topbar__btn" onClick={refresh} data-cursor="hover">↻ Refresh</button>
         </div>

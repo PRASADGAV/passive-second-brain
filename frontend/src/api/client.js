@@ -30,7 +30,12 @@ export const graphAPI = {
   updateConcept:    (id, data)              => client.put(`/graph/concept/${id}`, data),
   deleteConcept:    (id)                    => client.delete(`/graph/concept/${id}`),
   deleteSource:     (url)                   => client.delete(`/graph/source?source_url=${encodeURIComponent(url)}`),
-  exportJSON:       ()                      => client.get('/graph/export/json', { responseType: 'blob' }),
+  exportJSON:       ()                      => client.get('/graph/export/json',     { responseType: 'blob' }),
+  exportMarkdown:   ()                      => client.get('/graph/export/markdown', { responseType: 'blob' }),
+  getTimeline:      (days = 30)             => client.get(`/graph/timeline?days=${days}`),
+  getInsights:      ()                      => client.get('/graph/insights'),
+  getDuplicates:    (threshold = 0.82)      => client.get(`/graph/duplicates?threshold=${threshold}`),
+  mergeConcepts:    (keepId, mergeId)       => client.post('/graph/merge', { keep_id: keepId, merge_id: mergeId }),
 };
 
 // ── Ingest API ──
@@ -57,8 +62,9 @@ export const chatAPI = {
 
 // ── Memory API ──
 export const memoryAPI = {
-  getAlerts:  (threshold = 0.7) => client.get(`/memory/alerts?threshold=${threshold}`),
-  review:     (conceptId)       => client.post(`/memory/review/${conceptId}`),
+  getAlerts:        (threshold = 0.7) => client.get(`/memory/alerts?threshold=${threshold}`),
+  getReviewQueue:   (threshold = 0.5, limit = 20) => client.get(`/memory/review-queue?threshold=${threshold}&limit=${limit}`),
+  review:           (conceptId, quality = 4) => client.post(`/memory/review/${conceptId}?quality=${quality}`),
 };
 
 // ── Digest API ──

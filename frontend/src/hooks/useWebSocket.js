@@ -17,11 +17,15 @@ export function useWebSocket(url) {
       let wsUrl = url;
       if (!wsUrl) {
         const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-        if (apiBase) {
+        // If apiBase is a relative path (e.g. '/api') or empty, use the
+        // current window host so Vite's WS proxy handles it correctly.
+        const isAbsolute = apiBase.startsWith('http://') || apiBase.startsWith('https://');
+        if (isAbsolute) {
           const wsProto = apiBase.startsWith('https') ? 'wss' : 'ws';
-          const host = apiBase.replace(/^https?:\/\//, '').replace(/\/$/, '');
+          const host    = apiBase.replace(/^https?:\/\//, '').replace(/\/$/, '').split('/')[0];
           wsUrl = `${wsProto}://${host}/ws`;
         } else {
+          // Relative base URL or empty → connect via current host (Vite proxy handles /ws)
           const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
           wsUrl = `${wsProto}://${window.location.host}/ws`;
         }

@@ -509,3 +509,563 @@ async def seed_graph(request: Request) -> dict:
         "nodes_inserted": nodes_inserted,
         "edges_inserted": edges_inserted,
     }
+
+
+# ---------------------------------------------------------------------------
+# Timeline endpoint — daily concept/edge growth over time
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/timeline",
+    summary="Get daily knowledge graph growth timeline",
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_timeline(request: Request, days: int = 30) -> list:
+    """
+    Return per-day counts of concepts added over the last N days.
+    Used by the Timeline page to show knowledge growth visually.
+
+    Each entry: { date, nodes_added, edges_added, domains, cumulative_nodes }
+    """
+    if days < 1 or days > 365:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="days must be between 1 and 365.",
+        )
+
+    cypher = """
+        MATCH (c:Concept)
+        WHERE c.created_at IS NOT NULL
+        WITH date(datetime(c.created_at)) AS day, c.domain AS domain
+        RETURN day, count(*) AS nodes_added, collect(DISTINCT domain) AS domains
+        ORDER BY day DESC
+        LIMIT $days
+    """
+
+    cypher_edges = """
+        MATCH ()-[r]->()
+        WHERE r.created_at IS NOT NULL
+        WITH date(datetime(r.created_at)) AS day, count(*) AS edges_added
+        RETURN day, edges_added
+        ORDER BY day DESC
+        LIMIT $days
+    """
+
+    timeline = {}
+    try:
+        with request.app.state.neo4j.driver.session() as session:
+            # Node counts per day
+            result = session.run(cypher, days=days)
+            for record in result:
+                day_str = str(record["day"])
+                timeline[day_str] = {
+                    "date": day_str,
+                    "nodes_added": record["nodes_added"],
+                    "edges_added": 0,
+                    "domains": [d for d in record["domains"] if d],
+                }
+
+            # Edge counts per day
+            result2 = session.run(cypher_edges, days=days)
+            for record in result2:
+                day_str = str(record["day"])
+                if day_str in timeline:
+                    timeline[day_str]["edges_added"] = record["edges_added"]
+                else:
+                    timeline[day_str] = {
+                        "date": day_str,
+                        "nodes_added": 0,
+                        "edges_added": record["edges_added"],
+                        "domains": [],
+                    }
+    except Exception as exc:
+        logger.error("get_timeline: query failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve timeline data.",
+        )
+
+    # Sort ascending by date and compute cumulative node count
+    sorted_days = sorted(timeline.values(), key=lambda x: x["date"])
+    cumulative = 0
+    for entry in sorted_days:
+        cumulative += entry["nodes_added"]
+        entry["cumulative_nodes"] = cumulative
+
+    return sorted_days
+
+
+# ---------------------------------------------------------------------------
+# Insights endpoint — PageRank leaders, communities, forgotten, reviewed
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/insights",
+    summary="Get graph intelligence insights (PageRank, communities, memory stats)",
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_insights(request: Request) -> dict:
+    """
+    Surface PageRank top concepts, detected communities, most-forgotten
+    and most-reviewed nodes.  All data is already computed nightly by the
+    scheduler — this endpoint just reads it back.
+    """
+    top_concepts = []
+    communities: dict = {}
+    most_forgotten = []
+    most_reviewed = []
+
+    try:
+        with request.app.state.neo4j.driver.session() as session:
+
+            # ── Top concepts by edge count (PageRank fallback) ────────────
+            pr_cypher = """
+                MATCH (c:Concept)
+                OPTIONAL MATCH (c)-[r]-()
+                WITH c, count(r) AS edge_count
+                ORDER BY edge_count DESC
+                LIMIT 10
+                RETURN c.concept_id AS id, c.name AS name, c.domain AS domain,
+                       c.summary AS summary,
+                       coalesce(c.pagerank, 0.0) AS pagerank,
+                       edge_count
+            """
+            result = session.run(pr_cypher)
+            for rec in result:
+                top_concepts.append({
+                    "concept_id": rec["id"],
+                    "name":       rec["name"],
+                    "domain":     rec["domain"],
+                    "summary":    rec["summary"],
+                    "pagerank":   round(float(rec["pagerank"]), 4),
+                    "edge_count": rec["edge_count"],
+                })
+
+            # ── Community clusters ────────────────────────────────────────
+            comm_cypher = """
+                MATCH (c:Concept)
+                WHERE c.community_id IS NOT NULL
+                WITH c.community_id AS cid,
+                     collect(c.name)[..5] AS names,
+                     count(*) AS size
+                ORDER BY size DESC
+                LIMIT 8
+                RETURN cid, names, size
+            """
+            result2 = session.run(comm_cypher)
+            comm_list = []
+            for rec in result2:
+                comm_list.append({
+                    "id":           rec["cid"],
+                    "size":         rec["size"],
+                    "top_concepts": list(rec["names"]),
+                })
+            communities = comm_list
+
+            # ── Most forgotten ────────────────────────────────────────────
+            forgot_cypher = """
+                MATCH (c:Concept)
+                WHERE c.forget_score IS NOT NULL AND c.forget_score > 0
+                WITH c.concept_id AS id, c.name AS name,
+                     c.domain AS domain, c.forget_score AS forget_score
+                ORDER BY forget_score DESC
+                LIMIT 5
+                RETURN id, name, domain, forget_score
+            """
+            result3 = session.run(forgot_cypher)
+            for rec in result3:
+                most_forgotten.append({
+                    "concept_id":   rec["id"],
+                    "name":         rec["name"],
+                    "domain":       rec["domain"],
+                    "forget_score": round(float(rec["forget_score"]), 4),
+                })
+
+            # ── Most reviewed ─────────────────────────────────────────────
+            reviewed_cypher = """
+                MATCH (c:Concept)
+                WHERE c.rep_count IS NOT NULL AND c.rep_count > 0
+                WITH c.concept_id AS id, c.name AS name,
+                     c.domain AS domain, c.rep_count AS rep_count,
+                     c.ease_factor AS ease_factor
+                ORDER BY rep_count DESC
+                LIMIT 5
+                RETURN id, name, domain, rep_count, ease_factor
+            """
+            result4 = session.run(reviewed_cypher)
+            for rec in result4:
+                most_reviewed.append({
+                    "concept_id":  rec["id"],
+                    "name":        rec["name"],
+                    "domain":      rec["domain"],
+                    "rep_count":   rec["rep_count"],
+                    "ease_factor": round(float(rec["ease_factor"] or 2.5), 2),
+                })
+
+    except Exception as exc:
+        logger.error("get_insights: query failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve insights data.",
+        )
+
+    # Domain breakdown from stats
+    graph_stats = {}
+    try:
+        graph_stats = request.app.state.neo4j.get_stats()
+        domain_counts = graph_stats.get("domains", {})
+    except Exception:
+        domain_counts = {}
+
+    return {
+        "top_concepts":   top_concepts,
+        "communities":    communities,
+        "most_forgotten": most_forgotten,
+        "most_reviewed":  most_reviewed,
+        "domain_counts":  domain_counts,
+        "total_nodes":    graph_stats.get("node_count", 0),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Obsidian / Markdown export endpoint
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/export/markdown",
+    summary="Export knowledge graph as Obsidian-compatible Markdown ZIP",
+    dependencies=[Depends(verify_api_key)],
+)
+async def export_graph_markdown(request: Request) -> Response:
+    """
+    Generate one Markdown file per ConceptNode with backlinks between
+    related concepts. Returns a ZIP file ready to drop into Obsidian.
+
+    File format per concept:
+        # Concept Name
+        **Domain:** ...   **Retention:** ...%   **Source:** ...
+
+        Summary text...
+
+        ## Related Concepts
+        - [[Other Concept]] — RELATIONSHIP_TYPE
+    """
+    import io
+    import zipfile
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    filename = f"engram-export-{today}.zip"
+
+    # Fetch all nodes
+    nodes = request.app.state.neo4j.get_all_nodes(skip=0, limit=100_000)
+    node_map = {n.concept_id: n for n in nodes}
+
+    # Fetch all edges
+    edges_cypher = """
+        MATCH (a:Concept)-[r]->(b:Concept)
+        RETURN a.concept_id AS src, b.concept_id AS tgt,
+               type(r) AS rel_type, r.confidence AS confidence
+    """
+    edges_by_src: dict[str, list] = {}
+    try:
+        with request.app.state.neo4j.driver.session() as session:
+            result = session.run(edges_cypher)
+            for rec in result:
+                src = rec["src"]
+                if src not in edges_by_src:
+                    edges_by_src[src] = []
+                edges_by_src[src].append({
+                    "target_id": rec["tgt"],
+                    "type": rec["rel_type"],
+                    "confidence": rec["confidence"],
+                })
+    except Exception as exc:
+        logger.error("export_markdown: edge query failed: %s", exc)
+
+    # Build ZIP in memory
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for node in nodes:
+            retention_pct = round((1 - (node.forget_score or 0)) * 100)
+            source_display = node.source_url or "—"
+
+            lines = [
+                f"# {node.name}",
+                "",
+                f"**Domain:** {node.domain}  "
+                f"**Retention:** {retention_pct}%  "
+                f"**Reviews:** {node.rep_count}",
+                f"**Source:** {source_display}",
+                "",
+                node.summary or "",
+                "",
+            ]
+
+            # Related concepts section
+            related = edges_by_src.get(node.concept_id, [])
+            if related:
+                lines.append("## Related Concepts")
+                lines.append("")
+                for edge in related:
+                    target = node_map.get(edge["target_id"])
+                    if target:
+                        rel_label = edge["type"].replace("_", " ").title()
+                        conf = f"({edge['confidence']:.2f})" if edge["confidence"] else ""
+                        lines.append(f"- [[{target.name}]] — {rel_label} {conf}".rstrip())
+                lines.append("")
+
+            # Tags line for Obsidian
+            tag = node.domain.lower().replace(" ", "-")
+            lines.append(f"#engram #{tag}")
+
+            # Safe filename: replace slashes and colons
+            safe_name = (
+                node.name
+                .replace("/", "-")
+                .replace("\\", "-")
+                .replace(":", "-")
+                .replace("*", "-")
+                .replace("?", "")
+                .replace('"', "")
+                .replace("<", "")
+                .replace(">", "")
+                .replace("|", "-")
+            )[:80]
+
+            md_content = "\n".join(lines)
+            zf.writestr(f"{node.domain}/{safe_name}.md", md_content)
+
+        # Write an index file
+        index_lines = [
+            f"# ENGRAM Knowledge Export",
+            f"",
+            f"**Exported:** {today}  ",
+            f"**Total Concepts:** {len(nodes)}  ",
+            f"**Domains:** {len(set(n.domain for n in nodes))}",
+            f"",
+            "## All Concepts",
+            "",
+        ]
+        for node in sorted(nodes, key=lambda n: n.domain):
+            index_lines.append(f"- [[{node.name}]] ({node.domain})")
+        zf.writestr("_INDEX.md", "\n".join(index_lines))
+
+    buf.seek(0)
+    return Response(
+        content=buf.read(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Duplicate detection endpoint
+# ---------------------------------------------------------------------------
+
+class MergeRequest(BaseModel):
+    keep_id:  str   # concept to keep (absorbs edges + gets merged summary)
+    merge_id: str   # concept to delete after merging
+
+
+@router.get(
+    "/duplicates",
+    summary="Find near-duplicate concept pairs via name similarity",
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_duplicates(
+    request: Request,
+    threshold: float = 0.82,
+    limit: int = 30,
+) -> list:
+    """
+    Return pairs of concepts whose names are semantically similar enough to
+    be potential duplicates.  Uses normalised Levenshtein distance on lowered
+    names as a fast, dependency-free proxy for embedding similarity.
+
+    Each pair: { concept_a, concept_b, similarity, reason }
+    The calling UI lets the user decide whether to merge or dismiss.
+    """
+    if threshold < 0.5 or threshold > 1.0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="threshold must be between 0.5 and 1.0.",
+        )
+
+    nodes = request.app.state.neo4j.get_all_nodes(skip=0, limit=5000)
+
+    def _norm_lev(a: str, b: str) -> float:
+        """Normalised Levenshtein similarity in [0, 1]."""
+        a, b = a.lower().strip(), b.lower().strip()
+        if a == b:
+            return 1.0
+        la, lb = len(a), len(b)
+        if la == 0 or lb == 0:
+            return 0.0
+        # Build DP matrix
+        prev = list(range(lb + 1))
+        for i, ca in enumerate(a, 1):
+            curr = [i]
+            for j, cb in enumerate(b, 1):
+                curr.append(min(
+                    prev[j] + 1,
+                    curr[j - 1] + 1,
+                    prev[j - 1] + (0 if ca == cb else 1),
+                ))
+            prev = curr
+        dist = prev[lb]
+        return 1.0 - dist / max(la, lb)
+
+    pairs = []
+    node_list = list(nodes)
+    for i in range(len(node_list)):
+        for j in range(i + 1, len(node_list)):
+            a, b = node_list[i], node_list[j]
+            sim = _norm_lev(a.name, b.name)
+            if sim >= threshold:
+                # Also flag same-domain pairs with lower threshold
+                domain_bonus = 0.04 if a.domain == b.domain else 0.0
+                if sim + domain_bonus >= threshold:
+                    reason = "Identical names" if sim >= 0.99 else \
+                             "Very similar names" if sim >= 0.92 else \
+                             "Similar names"
+                    if a.domain == b.domain:
+                        reason += f" · same domain ({a.domain})"
+                    pairs.append({
+                        "concept_a": {
+                            "concept_id": a.concept_id,
+                            "name":       a.name,
+                            "domain":     a.domain,
+                            "rep_count":  a.rep_count,
+                            "forget_score": a.forget_score,
+                        },
+                        "concept_b": {
+                            "concept_id": b.concept_id,
+                            "name":       b.name,
+                            "domain":     b.domain,
+                            "rep_count":  b.rep_count,
+                            "forget_score": b.forget_score,
+                        },
+                        "similarity": round(sim, 4),
+                        "reason":     reason,
+                    })
+
+    pairs.sort(key=lambda p: p["similarity"], reverse=True)
+    return pairs[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Merge endpoint
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/merge",
+    summary="Merge two concept nodes — keep one, delete the other",
+    dependencies=[Depends(verify_api_key)],
+)
+async def merge_concepts(body: MergeRequest, request: Request) -> dict:
+    """
+    Merge concept *merge_id* into *keep_id*:
+
+    1. Re-point all edges from merge_id → keep_id (skip self-loops)
+    2. Re-point all edges to merge_id → keep_id (skip self-loops)
+    3. Update keep_id's summary to combine both summaries (if different)
+    4. Take the higher rep_count and lower forget_score
+    5. Delete merge_id from Neo4j and ChromaDB
+    """
+    if body.keep_id == body.merge_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="keep_id and merge_id must be different.",
+        )
+
+    keep_node  = request.app.state.neo4j.get_node(body.keep_id)
+    merge_node = request.app.state.neo4j.get_node(body.merge_id)
+
+    if keep_node is None:
+        raise HTTPException(status_code=404, detail=f"Concept '{body.keep_id}' not found.")
+    if merge_node is None:
+        raise HTTPException(status_code=404, detail=f"Concept '{body.merge_id}' not found.")
+
+    neo4j = request.app.state.neo4j
+
+    try:
+        with neo4j.driver.session() as session:
+
+            # 1 & 2 — Re-route all edges touching merge_id to keep_id
+            session.run("""
+                MATCH (m:Concept {concept_id: $mid})-[r]->(t:Concept)
+                WHERE t.concept_id <> $kid
+                WITH type(r) AS rel_type, t, r.confidence AS conf,
+                     r.created_at AS cat
+                MATCH (k:Concept {concept_id: $kid})
+                MERGE (k)-[nr:RELATED]->(t)
+                ON CREATE SET nr.confidence = conf, nr.created_at = cat
+                ON MATCH  SET nr.confidence = CASE
+                    WHEN nr.confidence < conf THEN conf ELSE nr.confidence END
+            """, mid=body.merge_id, kid=body.keep_id)
+
+            session.run("""
+                MATCH (s:Concept)-[r]->(m:Concept {concept_id: $mid})
+                WHERE s.concept_id <> $kid
+                WITH type(r) AS rel_type, s, r.confidence AS conf,
+                     r.created_at AS cat
+                MATCH (k:Concept {concept_id: $kid})
+                MERGE (s)-[nr:RELATED]->(k)
+                ON CREATE SET nr.confidence = conf, nr.created_at = cat
+                ON MATCH  SET nr.confidence = CASE
+                    WHEN nr.confidence < conf THEN conf ELSE nr.confidence END
+            """, mid=body.merge_id, kid=body.keep_id)
+
+            # 3 & 4 — Update keep_node fields
+            merged_summary = keep_node.summary or ""
+            if merge_node.summary and merge_node.summary not in merged_summary:
+                merged_summary = merged_summary + " " + merge_node.summary
+
+            new_rep_count   = max(keep_node.rep_count   or 0, merge_node.rep_count   or 0)
+            new_forget_score = min(keep_node.forget_score or 0, merge_node.forget_score or 0)
+
+            session.run("""
+                MATCH (k:Concept {concept_id: $kid})
+                SET k.summary     = $summary,
+                    k.rep_count   = $rc,
+                    k.forget_score = $fs
+            """,
+                kid=body.keep_id,
+                summary=merged_summary[:600],
+                rc=new_rep_count,
+                fs=new_forget_score,
+            )
+
+            # 5 — Delete merge_id node
+            session.run("""
+                MATCH (m:Concept {concept_id: $mid})
+                DETACH DELETE m
+            """, mid=body.merge_id)
+
+    except Exception as exc:
+        logger.error("merge_concepts: failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Merge failed: {exc}")
+
+    # Remove ChromaDB embedding for the deleted concept
+    try:
+        request.app.state.vector_db.delete_embedding(body.merge_id)
+        # Re-upsert keep_node with updated summary
+        request.app.state.vector_db.upsert_embedding(
+            body.keep_id,
+            keep_node.name,
+            merged_summary[:600],
+            {"domain": keep_node.domain, "source_url": keep_node.source_url or "",
+             "forget_score": new_forget_score},
+        )
+    except Exception as exc:
+        logger.warning("merge_concepts: ChromaDB update failed: %s", exc)
+
+    logger.info("merge_concepts: merged %s into %s", body.merge_id, body.keep_id)
+    return {
+        "status":  "merged",
+        "kept_id": body.keep_id,
+        "deleted_id": body.merge_id,
+        "kept_name":  keep_node.name,
+    }
