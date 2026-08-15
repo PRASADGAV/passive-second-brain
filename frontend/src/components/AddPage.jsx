@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ingestAPI } from '../api/client';
+import { ingestAPI, pipelineAPI } from '../api/client';
 
 const TABS = [
   { id: 'url',   label: 'URL',        icon: '🔗' },
@@ -10,15 +10,46 @@ const TABS = [
 ];
 
 export default function AddPage({ onBack }) {
-  const [tab,     setTab]    = useState('url');
-  const [url,     setUrl]    = useState('');
-  const [text,    setText]   = useState('');
-  const [loading, setLoading]= useState(false);
-  const [status,  setStatus] = useState(null);
+  const [tab,       setTab]      = useState('url');
+  const [url,       setUrl]      = useState('');
+  const [text,      setText]     = useState('');
+  const [loading,   setLoading]  = useState(false);
+  const [status,    setStatus]   = useState(null);
+  const [pipeline,  setPipeline] = useState({ running: false, done: false, error: null });
 
   const showStatus = (type, msg) => {
     setStatus({ type, msg });
     setTimeout(() => setStatus(null), 4000);
+  };
+
+  // ── Process Now (manual pipeline trigger) ────────────────────────────────
+  const runPipeline = async () => {
+    if (pipeline.running) return;
+    setPipeline({ running: true, done: false, error: null });
+    try {
+      await pipelineAPI.trigger();
+      // Poll status every 3s until no longer running
+      const poll = setInterval(async () => {
+        try {
+          const r = await pipelineAPI.getStatus();
+          const s = r.data?.status;
+          if (s !== 'running') {
+            clearInterval(poll);
+            if (s === 'failed') {
+              setPipeline({ running: false, done: false, error: r.data?.error || 'Pipeline failed.' });
+            } else {
+              setPipeline({ running: false, done: true, error: null });
+              setTimeout(() => setPipeline(p => ({ ...p, done: false })), 5000);
+            }
+          }
+        } catch { clearInterval(poll); setPipeline({ running: false, done: false, error: 'Status check failed.' }); }
+      }, 3000);
+    } catch (err) {
+      const msg = err.response?.status === 409
+        ? 'Pipeline is already running.'
+        : err.response?.data?.detail || 'Could not trigger pipeline.';
+      setPipeline({ running: false, done: false, error: msg });
+    }
   };
 
   const submitUrl = async e => {
@@ -163,6 +194,36 @@ export default function AddPage({ onBack }) {
             )}
           </motion.div>
         </AnimatePresence>
+        {/* ── Process Now ──────────────────────────────────────────────── */}
+        <motion.div className="process-now"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.5 }}>
+          <div className="process-now__left">
+            <div className="process-now__title">Process Now</div>
+            <div className="process-now__sub">
+              {pipeline.running
+                ? 'Pipeline running — extracting concepts…'
+                : pipeline.done
+                ? '✓ Done — knowledge graph updated.'
+                : pipeline.error
+                ? `⚠ ${pipeline.error}`
+                : 'Run the pipeline immediately to update your knowledge graph without waiting until midnight.'}
+            </div>
+          </div>
+          <button
+            className={`process-now__btn ${pipeline.running ? 'process-now__btn--running' : pipeline.done ? 'process-now__btn--done' : ''}`}
+            onClick={runPipeline}
+            disabled={pipeline.running}
+            data-cursor="hover"
+          >
+            {pipeline.running
+              ? <><span className="process-now__spinner" />Running…</>
+              : pipeline.done
+              ? '✓ Done'
+              : '▶ Run Now'}
+          </button>
+        </motion.div>
+
       </motion.div>
     </div>
   );

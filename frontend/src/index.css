@@ -4378,3 +4378,121 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
   color: rgba(255,255,255,.16);
   pointer-events: none; white-space: nowrap;
 }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Process Now — Manual Pipeline Trigger UI (AddPage + Dashboard)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── AddPage: Process Now card ──────────────────────────────────────────── */
+.process-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(99,102,241,.08) 0%, rgba(139,92,246,.08) 100%);
+  border: 1px solid rgba(99,102,241,.2);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+}
+.process-now__left { flex: 1; }
+.process-now__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-80);
+  margin-bottom: 4px;
+}
+.process-now__sub {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-60);
+}
+.process-now__btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: white;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .2s;
+  box-shadow: 0 2px 8px rgba(99,102,241,.25);
+}
+.process-now__btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99,102,241,.35);
+}
+.process-now__btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.process-now__btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+.process-now__btn--running {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+.process-now__btn--done {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+}
+.process-now__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Dashboard: Run Now button in nav ───────────────────────────────────── */
+.db3-run-now {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: white;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .18s;
+  box-shadow: 0 1px 4px rgba(99,102,241,.2);
+}
+.db3-run-now:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99,102,241,.3);
+}
+.db3-run-now:active:not(:disabled) {
+  transform: translateY(0);
+}
+.db3-run-now:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.db3-run-now--running {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  animation: pulse-btn 1.4s infinite;
+}
+.db3-run-now--done {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+}
+@keyframes pulse-btn {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .75; }
+}

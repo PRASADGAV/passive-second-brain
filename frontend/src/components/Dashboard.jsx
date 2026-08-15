@@ -304,6 +304,36 @@ export default function Dashboard({ onNavigate, wsConnected }) {
   const [pipeline, setPipeline] = useState({ status: 'idle' });
   const [domains,  setDomains]  = useState([]);
   const [ready,    setReady]    = useState(false);
+  const [triggering, setTriggering] = useState(false);
+  const [triggerDone, setTriggerDone] = useState(false);
+
+  const handleRunNow = async () => {
+    if (triggering || pipeline.status === 'running') return;
+    setTriggering(true);
+    try {
+      await pipelineAPI.trigger();
+      setPipeline({ status: 'running' });
+      setTriggerDone(false);
+      // Poll until done
+      const poll = setInterval(async () => {
+        try {
+          const r = await pipelineAPI.getStatus();
+          setPipeline(r.data);
+          if (r.data?.status !== 'running') {
+            clearInterval(poll);
+            setTriggering(false);
+            if (r.data?.status !== 'failed') {
+              setTriggerDone(true);
+              setTimeout(() => setTriggerDone(false), 4000);
+            }
+          }
+        } catch { clearInterval(poll); setTriggering(false); }
+      }, 3000);
+    } catch (err) {
+      if (err.response?.status !== 409) console.warn('Pipeline trigger failed', err);
+      setTriggering(false);
+    }
+  };
 
   useEffect(() => {
     Promise.allSettled([
@@ -361,6 +391,16 @@ export default function Dashboard({ onNavigate, wsConnected }) {
         </div>
         <div className="db3-nav__right">
           <PipelineChip status={pipeline.status} />
+          <motion.button
+            className={`db3-run-now ${pipeline.status === 'running' || triggering ? 'db3-run-now--running' : ''} ${triggerDone ? 'db3-run-now--done' : ''}`}
+            onClick={handleRunNow}
+            disabled={pipeline.status === 'running' || triggering}
+            whileTap={{ scale: 0.95 }}
+            data-cursor="hover"
+            title="Process queued captures now — don't wait until midnight"
+          >
+            {triggerDone ? '✓ Done' : pipeline.status === 'running' || triggering ? '⟳ Running…' : '▶ Process Now'}
+          </motion.button>
           <div className={`db3-chip ${wsConnected ? '' : 'db3-chip--dim'}`}
             style={{ '--chip-color': wsConnected ? '#34d399' : '#94a3b8' }}>
             <span className={`db3-chip__dot ${wsConnected ? 'db3-chip__dot--pulse' : ''}`}
