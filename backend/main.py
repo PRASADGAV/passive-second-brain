@@ -45,8 +45,12 @@ from backend.routers.playground import router as playground_router
 
 # ---------------------------------------------------------------------------
 # Load environment variables from .env (if present)
+# Load backend/.env first (real keys), then repo-root .env fills any gaps —
+# this works regardless of the directory the server is launched from.
 # ---------------------------------------------------------------------------
-load_dotenv()
+_backend_dir = Path(__file__).resolve().parent
+load_dotenv(_backend_dir / ".env")
+load_dotenv(_backend_dir.parent / ".env", override=False)
 
 # ---------------------------------------------------------------------------
 # Structured JSON logging

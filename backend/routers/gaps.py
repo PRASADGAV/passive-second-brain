@@ -20,13 +20,20 @@ from pydantic import BaseModel
 try:
     from backend.auth import verify_api_key
     from backend.prompts.gaps import SKILL_EXTRACTION_SYSTEM_PROMPT
+    from backend.services.extractor import clean_json_response
 except ModuleNotFoundError:
     from auth import verify_api_key
     from prompts.gaps import SKILL_EXTRACTION_SYSTEM_PROMPT
+    from services.extractor import clean_json_response
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["gaps"])
+
+# Maximum L2 distance (ChromaDB default metric) for a skill to count as
+# "present" in the graph. Calibrated against the seeded corpus: genuine
+# matches score ~0.6–0.9 while unrelated nearest-neighbours score >1.4.
+GAP_MATCH_MAX_DISTANCE = 1.1
 
 
 class GapRequest(BaseModel):
@@ -60,10 +67,10 @@ async def analyse_gaps(body: GapRequest, request: Request) -> dict:
             clean_text,
         )
 
-        # Parse JSON response
+        # Parse JSON response (strip markdown fences the LLM may add)
         skills = []
         try:
-            parsed = json.loads(raw_response)
+            parsed = json.loads(clean_json_response(raw_response))
             skills = parsed.get("skills", [])
         except json.JSONDecodeError:
             # Try to extract skills from malformed response
@@ -96,12 +103,13 @@ async def analyse_gaps(body: GapRequest, request: Request) -> dict:
         if not skill_name:
             continue
 
-        # Search via ChromaDB similarity
+        # Search via ChromaDB similarity with a relevance threshold —
+        # nearest-neighbour results below the score are treated as gaps
         try:
-            matches = request.app.state.vector_db.similarity_search(skill_name, top_k=1)
-            if matches:
+            matches = request.app.state.vector_db.similarity_search_scored(skill_name, top_k=1)
+            if matches and matches[0][1] <= GAP_MATCH_MAX_DISTANCE:
                 # Verify the match is actually relevant by fetching the node
-                node = request.app.state.neo4j.get_node(matches[0])
+                node = request.app.state.neo4j.get_node(matches[0][0])
                 if node:
                     present_skills.append({
                         "skill": skill_name,

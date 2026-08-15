@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
-import BrainXRayHero from './BrainXRayHero';
+import BrainScene from '../three/BrainScene';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette — monochrome + single indigo accent. No rainbows.
@@ -451,10 +451,10 @@ export default function LandingPage({ onEnter }) {
 
         {/* RIGHT — X-Ray hero + feature list */}
         <div className="lp3-right">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.8, ease: [0.16,1,0.3,1] }}>
-            <BrainXRayHero />
+          <motion.div className="brain-scene-wrap"
+            initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.9, ease: [0.16,1,0.3,1] }}>
+            <BrainScene />
           </motion.div>
 
           <div className="lp3-feat-list">

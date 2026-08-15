@@ -84,5 +84,33 @@
 
   // ─── Initialise ───────────────────────────────────────────────────────────
 
+  // ─── Connection settings ─────────────────────────────────────────────────
+
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsPanel  = document.getElementById('settings-panel');
+  const apiUrlInput    = document.getElementById('api-url');
+  const apiKeyInput    = document.getElementById('api-key');
+  const saveSettings   = document.getElementById('save-settings');
+  const settingsStatus = document.getElementById('settings-status');
+
+  // Populate saved values (background.js defaults apply when unset)
+  const { PSB_API_URL = '', PSB_API_KEY = '' } =
+    await chrome.storage.local.get(['PSB_API_URL', 'PSB_API_KEY']);
+  apiUrlInput.value = PSB_API_URL;
+  apiKeyInput.value = PSB_API_KEY;
+
+  settingsToggle.addEventListener('click', () => {
+    settingsPanel.classList.toggle('open');
+  });
+
+  saveSettings.addEventListener('click', async () => {
+    await chrome.storage.local.set({
+      PSB_API_URL: apiUrlInput.value.trim(),
+      PSB_API_KEY: apiKeyInput.value.trim(),
+    });
+    settingsStatus.textContent = 'Saved ✓';
+    setTimeout(() => { settingsStatus.textContent = ''; }, 2000);
+  });
+
   await loadState();
 })();

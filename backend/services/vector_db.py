@@ -186,6 +186,32 @@ class VectorDBService:
             )
             return []
 
+    def similarity_search_scored(self, query: str, top_k: int = 5) -> List[tuple]:
+        """
+        Like :meth:`similarity_search` but returns ``(concept_id, distance)``
+        tuples so callers can apply their own relevance threshold.
+
+        Distances use the collection's configured metric (L2 by default —
+        smaller is more similar). Returns an empty list on error.
+        """
+        try:
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=top_k,
+                include=["distances"],
+            )
+            ids = results["ids"][0] if results.get("ids") else []
+            distances = results["distances"][0] if results.get("distances") else []
+            return list(zip(ids, distances))
+        except Exception as exc:  # noqa: BLE001
+            logger.error(
+                "ChromaDB similarity_search_scored failed for query=%r: %s",
+                query,
+                exc,
+                extra={"component": "vector_db"},
+            )
+            return []
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

@@ -33,3 +33,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Pytest / hypothesis temp files
+.hypothesis/
+.qoder/

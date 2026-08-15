@@ -3990,11 +3990,11 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
 .lp3-right {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start;
+  align-items: stretch;
   gap: 0;
   overflow: hidden;
-  padding: 16px 20px 0;
+  padding: 12px 16px 0;
   border-left: 1px solid var(--t-border);
 }
 
@@ -4261,4 +4261,120 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
   display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* ── Brain 2D scene wrapper ── */
+.brain-scene-wrap {
+  width: 100%;
+  height: 380px;
+  position: relative;
+  overflow: hidden;
+  cursor: crosshair;
+  flex-shrink: 0;
+}
+.brain-scene-wrap canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   BRAIN 2D X-RAY  (brain2d)
+   ════════════════════════════════════════════════════════════════ */
+
+.brain2d {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  max-height: 400px;
+  cursor: crosshair;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* Both SVG layers sit on top of each other */
+.brain2d__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Depth layer — always at the back */
+.brain2d__svg--depth { z-index: 1; }
+
+/* Surface layer — on top, lens cuts hole via clip-path */
+.brain2d__svg--surface {
+  z-index: 2;
+  transition: clip-path 0ms; /* instant — rAF handles smoothness */
+  will-change: clip-path;
+}
+
+.brain2d__rim {
+  position: absolute;
+  z-index: 3;
+  width: 88px; height: 88px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(99,102,241,.9);
+  box-shadow:
+    0 0 14px rgba(99,102,241,.55),
+    0 0  4px rgba(99,102,241,.95),
+    inset 0 0 8px rgba(99,102,241,.12);
+  pointer-events: none;
+  will-change: left, top;
+  opacity: 0;
+  transition: opacity .18s;
+}
+.brain2d__rim--on { opacity: 1; }
+
+/* Concept label */
+.brain2d__label {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 14px;
+  background: rgba(4,4,14,.88);
+  border: 1px solid rgba(99,102,241,.45);
+  box-shadow: 0 0 14px rgba(99,102,241,.3);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.brain2d__label-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: dot-pulse 1.2s infinite;
+}
+.brain2d__label-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: #e2e8f0;
+}
+.brain2d__label-domain {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 500;
+  letter-spacing: .14em; text-transform: uppercase;
+  opacity: .75;
+}
+
+/* Hint */
+.brain2d__hint {
+  position: absolute;
+  bottom: 10px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; font-weight: 600;
+  letter-spacing: .22em; text-transform: uppercase;
+  color: rgba(255,255,255,.16);
+  pointer-events: none; white-space: nowrap;
 }

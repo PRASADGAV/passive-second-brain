@@ -13,6 +13,7 @@ Requirements:
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -150,6 +151,38 @@ def _validate_relationship(raw: dict) -> Optional[RawRelationship]:
 
 
 # ---------------------------------------------------------------------------
+# LLM response cleaning
+# ---------------------------------------------------------------------------
+
+def clean_json_response(raw: str) -> str:
+    """
+    Strip markdown code fences and stray prose from an LLM JSON response.
+
+    Llama frequently wraps JSON in ```json ... ``` fences despite the prompt
+    asking for raw JSON, which broke json.loads and silently discarded every
+    chunk. This cleaner:
+      1. Removes leading/trailing ``` fences (with optional json label).
+      2. Falls back to trimming everything outside the outermost braces.
+    """
+    text = raw.strip()
+
+    # Remove markdown fences
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json|JSON)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+
+    # Trim to outermost braces if the response still has surrounding prose
+    if text and not text.startswith("{"):
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end > start:
+            text = text[start:end + 1]
+
+    return text
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -188,7 +221,7 @@ def extract_concepts(chunk: str, chunk_index: int = 0) -> ExtractionResult:
 
     # --- Parse JSON ---------------------------------------------------------
     try:
-        parsed = json.loads(raw_response)
+        parsed = json.loads(clean_json_response(raw_response))
     except (json.JSONDecodeError, ValueError):
         logger.warning(
             "extractor: malformed JSON response for chunk %d — skipping. "
