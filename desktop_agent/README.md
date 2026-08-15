@@ -91,9 +91,51 @@ sudo dnf install xdotool    # Fedora
 
 **Windows** — add a shortcut to `agent.py` (run via `pythonw.exe` to suppress
 the console) in `shell:startup`:
+
+### Option 1: Startup Folder Shortcut (Easiest)
+
+```powershell
+cd desktop_agent
+.\install_startup_shortcut.ps1
 ```
-pythonw.exe C:\path\to\desktop_agent\agent.py
+
+The agent will start automatically on next login. To uninstall:
+```powershell
+.\install_startup_shortcut.ps1 -Uninstall
 ```
+
+### Option 2: Task Scheduler (Recommended)
+
+More robust — auto-restarts on crash, better control.
+
+```powershell
+cd desktop_agent
+.\install_windows_startup.ps1
+```
+
+To start immediately without rebooting:
+```powershell
+Start-ScheduledTask -TaskName "ENGRAM-Desktop-Agent"
+```
+
+To uninstall:
+```powershell
+.\install_windows_startup.ps1 -Uninstall
+```
+
+### Option 3: Windows Service (Most Robust — Requires Admin)
+
+Requires [NSSM](https://nssm.cc/download) and Administrator privileges.
+
+```powershell
+# Download NSSM, extract nssm.exe to C:\tools\nssm\win64\
+cd desktop_agent
+.\install_windows_service.ps1 -NssmPath "C:\tools\nssm\win64\nssm.exe"
+```
+
+The service starts automatically on boot (before login) and restarts if it crashes.
+
+---
 
 **macOS** — create a LaunchAgent plist in `~/Library/LaunchAgents/`:
 ```xml
