@@ -1,0 +1,24 @@
+# ENGRAM Desktop Agent — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Required ──────────────────────────────────────────────────────────────────
+requests==2.32.3          # HTTP client for backend POST + retry
+
+# ── Recommended (significantly improves activity detection) ──────────────────
+psutil==6.1.0             # Active process / PID detection (all platforms)
+pygetwindow==0.0.9        # Window title detection (Windows / partial macOS)
+
+# ── Optional: system tray icon (Pause/Resume via right-click) ────────────────
+pystray==0.19.5           # Cross-platform tray icon
+Pillow==11.1.0            # Image support required by pystray
+
+# ── Optional: PDF text extraction (highly recommended) ───────────────────────
+pymupdf==1.24.14          # PyMuPDF — fast, accurate PDF text extraction
+                          # Note: package name is pymupdf but imports as 'fitz'
+
+# ── Platform-specific notes ───────────────────────────────────────────────────
+# Windows:   all packages install cleanly via pip
+# macOS:     pygetwindow has limited support; window titles work via AppleScript
+# Linux:     install xdotool for window title detection:
+#              sudo apt install xdotool   # Debian/Ubuntu
+#              sudo dnf install xdotool   # Fedora

@@ -270,3 +270,143 @@ def _is_whisper_missing() -> bool:
     """Return True if whisper-cpp is not on the system PATH."""
     import shutil
     return shutil.which("whisper-cpp") is None
+
+
+# ---------------------------------------------------------------------------
+# Desktop agent ingest endpoint
+# Receives captures from the desktop_agent/ Python background process.
+# Follows the same request/response shape as /ingest/url so the same
+# nightly pipeline (concept extraction → Neo4j → ChromaDB) processes it.
+# ---------------------------------------------------------------------------
+
+
+class DesktopIngestRequest(BaseModel):
+    """
+    Payload sent by the desktop agent for each captured window/document.
+
+    Fields
+    ------
+    text : str
+        Readable text extracted from the focused window (document body,
+        clipboard text, or window title if full text is unavailable).
+    app_name : str
+        Name of the focused application (e.g. "Code", "Acrobat Reader").
+    window_title : str
+        Title of the focused window or document filename.
+    file_path : str | None
+        Absolute path to the file being read, if applicable.
+    duration_seconds : float
+        How many seconds the window was actively focused (≥ 60 by design).
+    domain : str | None
+        Optional knowledge domain tag supplied by the agent heuristic
+        (e.g. inferred from file extension or app name).
+    source_url : str | None
+        Optional URL if the desktop app is a browser-like viewer.
+    captured_at : str | None
+        ISO-8601 UTC timestamp from the agent (defaults to server time).
+    agent_version : str | None
+        Semver string of the desktop agent for diagnostics.
+    """
+
+    text:             str
+    app_name:         str
+    window_title:     str
+    file_path:        Optional[str]   = None
+    duration_seconds: float           = 60.0
+    domain:           Optional[str]   = None
+    source_url:       Optional[str]   = None
+    captured_at:      Optional[str]   = None
+    agent_version:    Optional[str]   = None
+
+
+@router.post(
+    "/desktop",
+    summary="Ingest a desktop activity capture from the desktop agent",
+    response_description="Queue acknowledgement with item_id and status.",
+    status_code=status.HTTP_200_OK,
+)
+async def ingest_desktop(
+    body: DesktopIngestRequest,
+    _key: str = Depends(verify_api_key),
+) -> dict:
+    """
+    Accept a desktop capture from the desktop_agent process and queue it
+    for the nightly extraction pipeline.
+
+    Validation
+    ----------
+    - ``text`` must be non-empty after stripping whitespace.
+    - ``app_name`` must be non-empty.
+    - ``duration_seconds`` must be ≥ 0.
+
+    The item is written to ``data/capture_queue/<uuid>.json`` with
+    ``source_type=desktop`` and ``status=pending``, identical to every other
+    ingest endpoint so the nightly pipeline picks it up without changes.
+    """
+    if not body.text or not body.text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="text must be a non-empty string.",
+        )
+    if not body.app_name or not body.app_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="app_name must be a non-empty string.",
+        )
+    if body.duration_seconds < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="duration_seconds must be ≥ 0.",
+        )
+
+    # Parse agent-supplied timestamp; fall back to server time.
+    now = datetime.now(timezone.utc)
+    if body.captured_at:
+        try:
+            from datetime import datetime as _dt
+            now = _dt.fromisoformat(body.captured_at.replace("Z", "+00:00"))
+        except ValueError:
+            pass  # ignore malformed timestamp; use server time
+
+    # Build a descriptive source URL so the graph UI shows something meaningful
+    # when the user inspects the captured concept's provenance.
+    source_url = body.source_url or ""
+    if not source_url and body.file_path:
+        source_url = f"file://{body.file_path}"
+    if not source_url:
+        source_url = f"desktop://{body.app_name}/{body.window_title}"
+
+    # Truncate text to 1 MB (same cap as scraper.py)
+    raw_text = body.text[:1_048_576]
+
+    item = CaptureItem(
+        id=uuid.uuid4(),
+        source_type=SourceType.desktop,
+        source_url=source_url,
+        raw_text=raw_text,
+        captured_at=now,
+        status=CaptureStatus.pending,
+        domain=body.domain,
+    )
+
+    _QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    item_path = _QUEUE_DIR / f"{item.id}.json"
+    item_path.write_text(item.model_dump_json(), encoding="utf-8")
+
+    logger.info(
+        "Desktop CaptureItem queued",
+        extra={
+            "component": "ingest_router",
+            "item_id":         str(item.id),
+            "app_name":        body.app_name,
+            "window_title":    body.window_title,
+            "duration_seconds": body.duration_seconds,
+            "queued_at":       now.isoformat(),
+        },
+    )
+
+    return {
+        "item_id":   str(item.id),
+        "status":    item.status.value,
+        "queued_at": now.isoformat(),
+    }

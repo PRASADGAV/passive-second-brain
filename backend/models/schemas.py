@@ -10,6 +10,7 @@ class SourceType(str, Enum):
     pdf     = "pdf"
     voice   = "voice"
     text    = "text"
+    desktop = "desktop"
 
 
 class CaptureStatus(str, Enum):

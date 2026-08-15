@@ -1,0 +1,16 @@
+{
+  "backend_url": "http://localhost:8090",
+  "api_key": "psb-secret-key-prasad-2025",
+  "threshold_seconds": 60,
+  "paused": false,
+  "blocked_apps": [
+    "explorer.exe",
+    "Finder",
+    "Dock",
+    "loginwindow",
+    "Spotlight",
+    "SystemPreferences",
+    "Task Manager",
+    "taskmgr.exe"
+  ]
+}
