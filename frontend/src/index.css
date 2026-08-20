@@ -4091,6 +4091,14 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
   .xray-hero__surface { transition: none; }
 }
 
+/* ── Brain X-Ray wrapper ── */
+.brain-xray-wrap {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto 3rem;
+  padding: 1rem;
+}
+
 /* ── X-Ray Hero wrapper ── */
 .xray-hero-wrap {
   width: 100%;
@@ -4504,4 +4512,284 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
 @keyframes pulse-btn {
   0%, 100% { opacity: 1; }
   50%      { opacity: .75; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Brain X-Ray Component — Interactive Cursor Lens Effect
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.brain-xray {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 500px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(0,20,40,0.8) 0%, rgba(0,10,30,0.9) 100%);
+  box-shadow: 0 20px 60px rgba(0,200,255,0.15), 0 0 80px rgba(0,200,255,0.05) inset;
+  
+  --lens-radius: 100px;
+  --feather: 50px;
+}
+
+/* ── Depth layer: X-ray interior (always behind) ──────────────────────────── */
+.brain-xray__depth {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.brain-xray__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.brain-xray__img--xray {
+  filter: 
+    brightness(1.4)
+    contrast(1.6)
+    saturate(0)
+    hue-rotate(180deg)
+    drop-shadow(0 0 20px rgba(0,200,255,0.6));
+  mix-blend-mode: screen;
+}
+
+/* Pulsing glow nodes on depth layer */
+.brain-xray__nodes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.brain-xray__node {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,230,255,1) 0%, rgba(0,230,255,0) 70%);
+  animation: pulse-node 2s ease-in-out infinite;
+  filter: blur(1px);
+}
+
+@keyframes pulse-node {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+}
+
+/* ── Surface layer: Full-color brain with lens mask ──────────────────────── */
+.brain-xray__surface {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  
+  /* Radial mask: transparent circle at cursor, opaque everywhere else */
+  -webkit-mask-image: radial-gradient(
+    circle var(--lens-radius) at var(--x) var(--y),
+    transparent 0%,
+    transparent calc(var(--lens-radius) - var(--feather)),
+    black var(--lens-radius)
+  );
+  mask-image: radial-gradient(
+    circle var(--lens-radius) at var(--x) var(--y),
+    transparent 0%,
+    transparent calc(var(--lens-radius) - var(--feather)),
+    black var(--lens-radius)
+  );
+  
+  transition: mask-position 0.08s ease-out;
+}
+
+.brain-xray__img--surface {
+  filter: 
+    brightness(1.1)
+    saturate(1.2)
+    contrast(1.05)
+    drop-shadow(0 0 30px rgba(0,200,255,0.3));
+  animation: float-brain 6s ease-in-out infinite;
+}
+
+@keyframes float-brain {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+/* Scan line animation on surface */
+.brain-xray__scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(0,230,255,0.6) 50%,
+    transparent 100%
+  );
+  animation: scan-sweep 4s linear infinite;
+  pointer-events: none;
+  filter: blur(1px);
+  opacity: 0.4;
+}
+
+@keyframes scan-sweep {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(500px);
+  }
+}
+
+/* ── Lens rim: glowing ring following cursor ──────────────────────────────── */
+.brain-xray__rim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(var(--lens-radius) * 2 + 8px);
+  height: calc(var(--lens-radius) * 2 + 8px);
+  border: 2px solid rgba(0,230,255,0.8);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  box-shadow: 
+    0 0 20px rgba(0,230,255,0.6),
+    inset 0 0 20px rgba(0,230,255,0.3);
+  animation: rim-pulse 2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.brain-xray__rim--visible {
+  opacity: 1;
+}
+
+@keyframes rim-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(0,230,255,0.6),
+      inset 0 0 20px rgba(0,230,255,0.3);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(0,230,255,0.9),
+      inset 0 0 30px rgba(0,230,255,0.5);
+  }
+}
+
+/* ── Hint text ──────────────────────────────────────────────────────────────── */
+.brain-xray__hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(0,20,40,0.85);
+  border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px;
+  color: rgba(0,230,255,0.9);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  animation: hint-fade 3s ease-in-out infinite;
+}
+
+.brain-xray__hint-icon {
+  flex-shrink: 0;
+  color: rgba(0,230,255,0.7);
+  animation: hint-icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hint-fade {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes hint-icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+/* ── Loading state ──────────────────────────────────────────────────────────── */
+.brain-xray__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(0,20,40,0.95) 0%, rgba(0,10,30,0.98) 100%);
+  color: rgba(0,230,255,0.8);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.brain-xray__spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(0,230,255,0.2);
+  border-top-color: rgba(0,230,255,0.8);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ── Responsive adjustments ──────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .brain-xray {
+    max-width: 100%;
+    --lens-radius: 80px;
+    --feather: 40px;
+  }
+  
+  .brain-xray__hint {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .brain-xray__rim,
+  .brain-xray__img--surface,
+  .brain-xray__scanline,
+  .brain-xray__node,
+  .brain-xray__hint,
+  .brain-xray__hint-icon {
+    animation: none;
+  }
+  
+  .brain-xray__surface {
+    transition: none;
+  }
 }
