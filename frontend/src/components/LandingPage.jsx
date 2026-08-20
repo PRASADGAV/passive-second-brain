@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useMotionValue, useSpring, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
-import BrainXRay from './BrainXRay';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Colour palette — monochrome + single indigo accent. No rainbows.
@@ -454,7 +453,7 @@ export default function LandingPage({ onEnter }) {
           <motion.div className="brain-xray-wrap"
             initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3, duration: 0.9, ease: [0.16,1,0.3,1] }}>
-            <BrainXRay />
+            <XRayHero />
           </motion.div>
 
           <div className="lp3-feat-list">
