@@ -4091,6 +4091,15 @@ hr.divider { border: none; border-top: 1px solid var(--ink-10); margin: 20px 0; 
   .xray-hero__surface { transition: none; }
 }
 
+/* ── X-Ray Hero wrapper ── */
+.xray-hero-wrap {
+  width: 100%;
+  height: 380px;
+  border-radius: 16px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
 /* ── Feature list (right column) ── */
 .lp3-feat-list { display: flex; flex-direction: column; gap: 0; }
 .lp3-feat-row {
